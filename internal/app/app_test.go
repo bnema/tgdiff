@@ -15,40 +15,73 @@ import (
 func TestNewBuildsRootCommand(t *testing.T) {
 	t.Parallel()
 
-	application, err := New()
-	require.NoError(t, err)
-	require.NotNil(t, application)
-	require.NotNil(t, application.RootCommand())
-	assert.Equal(t, "tgdiff", application.RootCommand().Use)
+	tests := []struct {
+		name      string
+		expectUse string
+	}{
+		{name: "default app", expectUse: "tgdiff"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			application, err := New()
+			require.NoError(t, err)
+			require.NotNil(t, application)
+			require.NotNil(t, application.RootCommand())
+			assert.Equal(t, tt.expectUse, application.RootCommand().Use)
+		})
+	}
 }
 
 func TestRunLoadsReviewAndRunsTUIWithConfig(t *testing.T) {
 	t.Parallel()
 
-	cfg := viper.New()
-	loader := &fakeReviewLoader{
-		files: []core.ReviewFile{{
-			Path: "demo.go",
-			Sections: []core.ReviewSection{{
-				ID:   "changed-1",
-				Kind: core.SectionKindChanged,
-				Lines: []core.ReviewLine{{NewLineNumber: 1, Content: "package main", Kind: core.LineKindAdded}},
-			}},
-		}},
+	tests := []struct {
+		name          string
+		args          []string
+		expectRepo    string
+		expectContext int
+	}{
+		{
+			name:          "explicit repo path and context lines",
+			args:          []string{"--repo-path", "/tmp/repo", "--context-lines", "2"},
+			expectRepo:    "/tmp/repo",
+			expectContext: 2,
+		},
 	}
-	runner := &fakeRunner{}
 
-	application, err := newApp(cfg, loader, runner)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	err = application.Run([]string{"--repo-path", "/tmp/repo", "--context-lines", "2"}, &stdout, &stderr)
-	require.NoError(t, err)
+			cfg := viper.New()
+			loader := &fakeReviewLoader{
+				files: []core.ReviewFile{{
+					Path: "demo.go",
+					Sections: []core.ReviewSection{{
+						ID:    "changed-1",
+						Kind:  core.SectionKindChanged,
+						Lines: []core.ReviewLine{{NewLineNumber: 1, Content: "package main", Kind: core.LineKindAdded}},
+					}},
+				}},
+			}
+			runner := &fakeRunner{}
 
-	assert.Equal(t, "/tmp/repo", loader.repoPath)
-	assert.Equal(t, 2, loader.contextLines)
-	require.NotNil(t, runner.model)
+			application, err := newApp(cfg, loader, runner)
+			require.NoError(t, err)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			err = application.Run(tt.args, &stdout, &stderr)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expectRepo, loader.repoPath)
+			assert.Equal(t, tt.expectContext, loader.contextLines)
+			require.NotNil(t, runner.model)
+		})
+	}
 }
 
 type fakeReviewLoader struct {

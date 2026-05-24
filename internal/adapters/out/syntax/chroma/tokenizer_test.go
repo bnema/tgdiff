@@ -37,48 +37,111 @@ func (f *failingLexer) AnalyseText(string) float32 {
 func TestSemanticTokenTypeFromChroma(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, core.SemanticTokenKeyword, SemanticTokenTypeFromChroma("Keyword"))
-	assert.Equal(t, core.SemanticTokenFunction, SemanticTokenTypeFromChroma("Name.Function"))
-	assert.Equal(t, core.SemanticTokenString, SemanticTokenTypeFromChroma("Literal.String.Double"))
-	assert.Equal(t, core.SemanticTokenText, SemanticTokenTypeFromChroma("Text"))
+	tests := []struct {
+		name     string
+		chroma   string
+		expected core.SemanticTokenType
+	}{
+		{name: "keyword", chroma: "Keyword", expected: core.SemanticTokenKeyword},
+		{name: "function", chroma: "Name.Function", expected: core.SemanticTokenFunction},
+		{name: "string", chroma: "Literal.String.Double", expected: core.SemanticTokenString},
+		{name: "text", chroma: "Text", expected: core.SemanticTokenText},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.expected, SemanticTokenTypeFromChroma(tt.chroma))
+		})
+	}
 }
 
 func TestTokenizerTokenizeMapsSemanticTypes(t *testing.T) {
 	t.Parallel()
 
-	tokenizer := NewTokenizer()
-	tokens, err := tokenizer.Tokenize("main.go", []string{"package main"})
-	require.NoError(t, err)
-	require.Len(t, tokens, 1)
-	require.NotEmpty(t, tokens[0])
-	assert.Equal(t, core.SemanticTokenKeyword, tokens[0][0].Type)
+	tests := []struct {
+		name         string
+		filename     string
+		lines        []string
+		expectedType core.SemanticTokenType
+	}{
+		{name: "go package keyword", filename: "main.go", lines: []string{"package main"}, expectedType: core.SemanticTokenKeyword},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tokenizer := NewTokenizer()
+			tokens, err := tokenizer.Tokenize(tt.filename, tt.lines)
+			require.NoError(t, err)
+			require.Len(t, tokens, 1)
+			require.NotEmpty(t, tokens[0])
+			assert.Equal(t, tt.expectedType, tokens[0][0].Type)
+		})
+	}
 }
 
 func TestTokenizerTokenizePreservesFullChromaTokenType(t *testing.T) {
 	t.Parallel()
 
-	tokenizer := NewTokenizer()
-	tokens, err := tokenizer.Tokenize("main.go", []string{"func main() {", "\treturn", "}"})
-	require.NoError(t, err)
-	require.Len(t, tokens, 3)
-	require.NotEmpty(t, tokens[0])
-
-	var tokenTypes []string
-	for _, token := range tokens[0] {
-		tokenTypes = append(tokenTypes, token.ChromaType)
+	tests := []struct {
+		name          string
+		filename      string
+		lines         []string
+		expectedTypes []string
+	}{
+		{
+			name:          "go function declaration",
+			filename:      "main.go",
+			lines:         []string{"func main() {", "\treturn", "}"},
+			expectedTypes: []string{"KeywordDeclaration", "NameFunction"},
+		},
 	}
-	assert.Contains(t, tokenTypes, "KeywordDeclaration")
-	assert.Contains(t, tokenTypes, "NameFunction")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tokenizer := NewTokenizer()
+			tokens, err := tokenizer.Tokenize(tt.filename, tt.lines)
+			require.NoError(t, err)
+			require.Len(t, tokens, len(tt.lines))
+			require.NotEmpty(t, tokens[0])
+
+			var tokenTypes []string
+			for _, token := range tokens[0] {
+				tokenTypes = append(tokenTypes, token.ChromaType)
+			}
+			for _, expectedType := range tt.expectedTypes {
+				assert.Contains(t, tokenTypes, expectedType)
+			}
+		})
+	}
 }
 
 func TestTokenizerTokenizePropagatesLexerErrors(t *testing.T) {
 	t.Parallel()
 
-	tokenizer := NewTokenizer()
-	tokenizer.lexerCache.Store(".broken", &failingLexer{})
+	tests := []struct {
+		name     string
+		filename string
+		lines    []string
+	}{
+		{name: "lexer error", filename: "file.broken", lines: []string{"content"}},
+	}
 
-	tokens, err := tokenizer.Tokenize("file.broken", []string{"content"})
-	require.Error(t, err)
-	require.Len(t, tokens, 1)
-	assert.Empty(t, tokens[0])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tokenizer := NewTokenizer()
+			tokenizer.lexerCache.Store(".broken", &failingLexer{})
+
+			tokens, err := tokenizer.Tokenize(tt.filename, tt.lines)
+			require.Error(t, err)
+			require.Len(t, tokens, len(tt.lines))
+			assert.Empty(t, tokens[0])
+		})
+	}
 }

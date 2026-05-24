@@ -15,153 +15,235 @@ import (
 func TestModelViewUsesAlternateScreen(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel([]core.ReviewFile{reviewFile("demo.go", "package main")})
+	tests := []struct {
+		name  string
+		files []core.ReviewFile
+	}{
+		{name: "review view", files: []core.ReviewFile{reviewFile("demo.go", "package main")}},
+	}
 
-	assert.True(t, model.View().AltScreen)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			model := NewModel(tt.files)
+			assert.True(t, model.View().AltScreen)
+		})
+	}
 }
 
 func TestModelViewRendersSequentialReviewDocumentWithoutFileExplorer(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel([]core.ReviewFile{
-		reviewFile("zeta.go", "package zeta"),
-		reviewFile("alpha.go", "package alpha"),
-	})
+	tests := []struct {
+		name  string
+		files []core.ReviewFile
+	}{
+		{
+			name: "sorts files by path in a single review document",
+			files: []core.ReviewFile{
+				reviewFile("zeta.go", "package zeta"),
+				reviewFile("alpha.go", "package alpha"),
+			},
+		},
+	}
 
-	view := model.View().Content
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Contains(t, view, "tgdiff")
-	assert.NotContains(t, view, "Files")
-	assert.NotContains(t, view, "▸")
-	assert.Less(t, strings.Index(view, "alpha.go"), strings.Index(view, "zeta.go"))
-	assert.Contains(t, view, "package alpha")
-	assert.Contains(t, view, "package zeta")
+			model := NewModel(tt.files)
+			view := model.View().Content
+
+			assert.Contains(t, view, "tgdiff")
+			assert.NotContains(t, view, "Files")
+			assert.NotContains(t, view, "▸")
+			assert.Less(t, strings.Index(view, "alpha.go"), strings.Index(view, "zeta.go"))
+			assert.Contains(t, view, "package alpha")
+			assert.Contains(t, view, "package zeta")
+		})
+	}
 }
 
 func TestModelScrollsSequentialReviewDocumentWithJKAndArrows(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel([]core.ReviewFile{reviewFileWithLines("demo.go", 80)})
-	updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
-	model = updated.(Model)
+	tests := []struct {
+		name string
+		keys []tea.KeyPressMsg
+	}{
+		{
+			name: "j k and down update viewport offset",
+			keys: []tea.KeyPressMsg{{Text: "j", Code: 'j'}, {Text: "k", Code: 'k'}, {Code: tea.KeyDown}},
+		},
+	}
 
-	initial := model.reviewViewport.YOffset()
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "j", Code: 'j'})
-	model = updated.(Model)
-	assert.Greater(t, model.reviewViewport.YOffset(), initial)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	afterJ := model.reviewViewport.YOffset()
-	updated, _ = model.Update(tea.KeyPressMsg{Text: "k", Code: 'k'})
-	model = updated.(Model)
-	assert.Less(t, model.reviewViewport.YOffset(), afterJ)
+			model := NewModel([]core.ReviewFile{reviewFileWithLines("demo.go", 80)})
+			updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+			model = updated.(Model)
 
-	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyDown})
-	model = updated.(Model)
-	assert.Greater(t, model.reviewViewport.YOffset(), initial)
+			initial := model.reviewViewport.YOffset()
+			updated, _ = model.Update(tt.keys[0])
+			model = updated.(Model)
+			assert.Greater(t, model.reviewViewport.YOffset(), initial)
+
+			afterDown := model.reviewViewport.YOffset()
+			updated, _ = model.Update(tt.keys[1])
+			model = updated.(Model)
+			assert.Less(t, model.reviewViewport.YOffset(), afterDown)
+
+			updated, _ = model.Update(tt.keys[2])
+			model = updated.(Model)
+			assert.Greater(t, model.reviewViewport.YOffset(), initial)
+		})
+	}
 }
 
 func TestModelViewRendersPolishedStatusBar(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel([]core.ReviewFile{reviewFile("demo.go", "package main")})
-	updated, _ := model.Update(tea.WindowSizeMsg{Width: 90, Height: 12})
-	model = updated.(Model)
+	tests := []struct {
+		name   string
+		width  int
+		height int
+	}{
+		{name: "status bar fits configured width", width: 90, height: 12},
+	}
 
-	view := stripANSI(model.View().Content)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Contains(t, view, "tgdiff")
-	assert.Contains(t, view, "1 file")
-	assert.Contains(t, view, "j/k")
-	assert.Contains(t, view, "expand")
-	assert.Contains(t, view, "quit")
-	for line := range strings.SplitSeq(view, "\n") {
-		assert.LessOrEqual(t, len([]rune(line)), 90)
+			model := NewModel([]core.ReviewFile{reviewFile("demo.go", "package main")})
+			updated, _ := model.Update(tea.WindowSizeMsg{Width: tt.width, Height: tt.height})
+			model = updated.(Model)
+
+			view := stripANSI(model.View().Content)
+
+			assert.Contains(t, view, "tgdiff")
+			assert.Contains(t, view, "1 file")
+			assert.Contains(t, view, "j/k")
+			assert.Contains(t, view, "expand")
+			assert.Contains(t, view, "quit")
+			for line := range strings.SplitSeq(view, "\n") {
+				assert.LessOrEqual(t, len([]rune(line)), tt.width)
+			}
+		})
 	}
 }
 
-func TestFormatReviewLineAppliesSyntaxHighlightingAndLineNumbers(t *testing.T) {
+func TestFormatReviewLine(t *testing.T) {
 	t.Parallel()
 
-	line := core.ReviewLine{
-		OldLineNumber: 4,
-		NewLineNumber: 5,
-		Content:       "func main() {}",
-		Kind:          core.LineKindAdded,
-		SyntaxTokens: []core.SyntaxToken{
-			{Start: 0, End: 4, Type: core.SemanticTokenKeyword},
-			{Start: 5, End: 9, Type: core.SemanticTokenFunction},
+	tests := []struct {
+		name        string
+		line        core.ReviewLine
+		contains    []string
+		notContains []string
+		stripped    string
+	}{
+		{
+			name: "applies syntax highlighting and line numbers",
+			line: core.ReviewLine{
+				OldLineNumber: 4,
+				NewLineNumber: 5,
+				Content:       "func main() {}",
+				Kind:          core.LineKindAdded,
+				SyntaxTokens: []core.SyntaxToken{
+					{Start: 0, End: 4, Type: core.SemanticTokenKeyword},
+					{Start: 5, End: 9, Type: core.SemanticTokenFunction},
+				},
+			},
+			contains: []string{"   4", "   5", "+", "func", "main", "\x1b["},
+		},
+		{
+			name: "preserves faded diff background with chroma syntax foregrounds",
+			line: core.ReviewLine{
+				NewLineNumber: 5,
+				Content:       "func main() {}",
+				Kind:          core.LineKindAdded,
+				SyntaxTokens: []core.SyntaxToken{
+					{Start: 0, End: 4, Type: core.SemanticTokenText, ChromaType: "KeywordDeclaration"},
+					{Start: 5, End: 9, Type: core.SemanticTokenText, ChromaType: "NameFunction"},
+				},
+			},
+			contains:    []string{"48;2;1;18;9", "38;2;255;123;114", "38;2;210;168;255"},
+			notContains: []string{"48;2;3;47;23", "48;2;218;251;225"},
+			stripped:    "+ func main() {}",
 		},
 	}
 
-	rendered := formatReviewLine(line, 4)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Contains(t, rendered, "   4")
-	assert.Contains(t, rendered, "   5")
-	assert.Contains(t, rendered, "+")
-	assert.Contains(t, rendered, "func")
-	assert.Contains(t, rendered, "main")
-	assert.Contains(t, rendered, "\x1b[")
-}
-
-func TestFormatReviewLinePreservesDiffBackgroundWithSyntaxHighlighting(t *testing.T) {
-	t.Parallel()
-
-	line := core.ReviewLine{
-		NewLineNumber: 5,
-		Content:       "func main() {}",
-		Kind:          core.LineKindAdded,
-		SyntaxTokens: []core.SyntaxToken{
-			{Start: 0, End: 4, Type: core.SemanticTokenText, ChromaType: "KeywordDeclaration"},
-			{Start: 5, End: 9, Type: core.SemanticTokenText, ChromaType: "NameFunction"},
-		},
+			rendered := formatReviewLine(tt.line, 4)
+			for _, expected := range tt.contains {
+				assert.Contains(t, rendered, expected)
+			}
+			for _, unexpected := range tt.notContains {
+				assert.NotContains(t, rendered, unexpected)
+			}
+			if tt.stripped != "" {
+				assert.Contains(t, stripANSI(rendered), tt.stripped)
+			}
+		})
 	}
-
-	rendered := formatReviewLine(line, 4)
-
-	assert.Contains(t, rendered, "48;2;1;18;9", "added-line background should be very faded")
-	assert.Contains(t, rendered, "38;2;255;123;114", "keyword should use Chroma github-dark syntax foreground")
-	assert.Contains(t, rendered, "38;2;210;168;255", "function should use Chroma github-dark syntax foreground")
-	assert.NotContains(t, rendered, "48;2;3;47;23", "old diff green is still too visually heavy")
-	assert.NotContains(t, rendered, "48;2;218;251;225", "light GitHub green background dominates dark terminals")
-	assert.Contains(t, stripANSI(rendered), "+ func main() {}")
 }
 
 func TestModelUpdateKeepsExpanderFocusVisibleAfterSectionExpands(t *testing.T) {
 	t.Parallel()
 
-	model := NewModel([]core.ReviewFile{{
-		Path: "demo.go",
-		Sections: []core.ReviewSection{
-			{
-				ID:   "context-1",
-				Kind: core.SectionKindContext,
-				Lines: []core.ReviewLine{
-					{NewLineNumber: 1, Content: "line 1", Kind: core.LineKindUnchanged},
-					{NewLineNumber: 2, Content: "line 2", Kind: core.LineKindUnchanged},
-				},
-			},
-			{
-				ID:   "changed-1",
-				Kind: core.SectionKindChanged,
-				Lines: []core.ReviewLine{{NewLineNumber: 3, Content: "changed", Kind: core.LineKindAdded}},
-			},
-			{
-				ID:   "context-2",
-				Kind: core.SectionKindContext,
-				Lines: []core.ReviewLine{
-					{NewLineNumber: 4, Content: "line 4", Kind: core.LineKindUnchanged},
-					{NewLineNumber: 5, Content: "line 5", Kind: core.LineKindUnchanged},
-				},
-			},
-		},
-	}})
+	tests := []struct {
+		name              string
+		key               tea.KeyPressMsg
+		expectedSectionID string
+	}{
+		{name: "enter expands selected context and advances focus", key: tea.KeyPressMsg{Code: tea.KeyEnter}, expectedSectionID: "context-2"},
+	}
 
-	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(Model)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	section := model.selectedContextSection()
-	require.NotNil(t, section)
-	assert.Equal(t, "context-2", section.ID)
+			model := NewModel([]core.ReviewFile{{
+				Path: "demo.go",
+				Sections: []core.ReviewSection{
+					{
+						ID:   "context-1",
+						Kind: core.SectionKindContext,
+						Lines: []core.ReviewLine{
+							{NewLineNumber: 1, Content: "line 1", Kind: core.LineKindUnchanged},
+							{NewLineNumber: 2, Content: "line 2", Kind: core.LineKindUnchanged},
+						},
+					},
+					{
+						ID:    "changed-1",
+						Kind:  core.SectionKindChanged,
+						Lines: []core.ReviewLine{{NewLineNumber: 3, Content: "changed", Kind: core.LineKindAdded}},
+					},
+					{
+						ID:   "context-2",
+						Kind: core.SectionKindContext,
+						Lines: []core.ReviewLine{
+							{NewLineNumber: 4, Content: "line 4", Kind: core.LineKindUnchanged},
+							{NewLineNumber: 5, Content: "line 5", Kind: core.LineKindUnchanged},
+						},
+					},
+				},
+			}})
+
+			updated, _ := model.Update(tt.key)
+			model = updated.(Model)
+
+			section := model.selectedContextSection()
+			require.NotNil(t, section)
+			assert.Equal(t, tt.expectedSectionID, section.ID)
+		})
+	}
 }
 
 var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -174,8 +256,8 @@ func reviewFile(path, content string) core.ReviewFile {
 	return core.ReviewFile{
 		Path: path,
 		Sections: []core.ReviewSection{{
-			ID:   path + "-changed",
-			Kind: core.SectionKindChanged,
+			ID:    path + "-changed",
+			Kind:  core.SectionKindChanged,
 			Lines: []core.ReviewLine{{NewLineNumber: 1, Content: content, Kind: core.LineKindAdded}},
 		}},
 	}
@@ -187,7 +269,7 @@ func reviewFileWithLines(path string, count int) core.ReviewFile {
 		lines = append(lines, core.ReviewLine{NewLineNumber: i, Content: "line", Kind: core.LineKindAdded})
 	}
 	return core.ReviewFile{
-		Path: path,
+		Path:     path,
 		Sections: []core.ReviewSection{{ID: "changed", Kind: core.SectionKindChanged, Lines: lines}},
 	}
 }

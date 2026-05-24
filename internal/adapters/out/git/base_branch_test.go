@@ -9,119 +9,92 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRepositoryLoaderResolveBaseBranchFromOriginHEAD(t *testing.T) {
+func TestRepositoryLoaderResolveBaseBranch(t *testing.T) {
 	t.Parallel()
 
-	dir := t.TempDir()
-	repo, err := ggit.PlainInit(dir, false)
-	require.NoError(t, err)
-	require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-		plumbing.ReferenceName("refs/remotes/origin/main"),
-		plumbing.NewHash("1111111111111111111111111111111111111111"),
-	)))
-	require.NoError(t, repo.Storer.SetReference(plumbing.NewSymbolicReference(
-		plumbing.ReferenceName("refs/remotes/origin/HEAD"),
-		plumbing.ReferenceName("refs/remotes/origin/main"),
-	)))
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T, repo *ggit.Repository)
+		expected string
+	}{
+		{
+			name: "from origin HEAD",
+			setup: func(t *testing.T, repo *ggit.Repository) {
+				t.Helper()
+				setHashRef(t, repo, "refs/remotes/origin/main", "1111111111111111111111111111111111111111")
+				setSymbolicRef(t, repo, "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+			},
+			expected: "main",
+		},
+		{
+			name: "falls back when origin HEAD target is missing",
+			setup: func(t *testing.T, repo *ggit.Repository) {
+				t.Helper()
+				setSymbolicRef(t, repo, "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+				setHashRef(t, repo, "refs/remotes/origin/master", "2222222222222222222222222222222222222222")
+			},
+			expected: "master",
+		},
+		{
+			name: "origin HEAD beats fallbacks",
+			setup: func(t *testing.T, repo *ggit.Repository) {
+				t.Helper()
+				setHashRef(t, repo, "refs/remotes/origin/master", "3333333333333333333333333333333333333333")
+				setHashRef(t, repo, plumbing.NewBranchReferenceName("main").String(), "4444444444444444444444444444444444444444")
+				setHashRef(t, repo, "refs/remotes/origin/main", "5555555555555555555555555555555555555555")
+				setSymbolicRef(t, repo, "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+			},
+			expected: "main",
+		},
+		{
+			name: "remote fallback beats local fallback",
+			setup: func(t *testing.T, repo *ggit.Repository) {
+				t.Helper()
+				setHashRef(t, repo, "refs/remotes/origin/master", "6666666666666666666666666666666666666666")
+				setHashRef(t, repo, plumbing.NewBranchReferenceName("main").String(), "7777777777777777777777777777777777777777")
+			},
+			expected: "master",
+		},
+		{
+			name: "local main beats local master",
+			setup: func(t *testing.T, repo *ggit.Repository) {
+				t.Helper()
+				setHashRef(t, repo, plumbing.NewBranchReferenceName("main").String(), "8888888888888888888888888888888888888888")
+				setHashRef(t, repo, plumbing.NewBranchReferenceName("master").String(), "9999999999999999999999999999999999999999")
+			},
+			expected: "main",
+		},
+	}
 
-	loader := NewRepositoryLoader()
-	branch, err := loader.ResolveBaseBranch(dir)
-	require.NoError(t, err)
-	assert.Equal(t, "main", branch)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			repo, err := ggit.PlainInit(dir, false)
+			require.NoError(t, err)
+			tt.setup(t, repo)
+
+			loader := NewRepositoryLoader()
+			branch, err := loader.ResolveBaseBranch(dir)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, branch)
+		})
+	}
 }
 
-func TestRepositoryLoaderResolveBaseBranchFallsBackWhenOriginHEADTargetIsMissing(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	repo, err := ggit.PlainInit(dir, false)
-	require.NoError(t, err)
-	require.NoError(t, repo.Storer.SetReference(plumbing.NewSymbolicReference(
-		plumbing.ReferenceName("refs/remotes/origin/HEAD"),
-		plumbing.ReferenceName("refs/remotes/origin/main"),
-	)))
+func setHashRef(t *testing.T, repo *ggit.Repository, name, hash string) {
+	t.Helper()
 	require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-		plumbing.ReferenceName("refs/remotes/origin/master"),
-		plumbing.NewHash("2222222222222222222222222222222222222222"),
+		plumbing.ReferenceName(name),
+		plumbing.NewHash(hash),
 	)))
-
-	loader := NewRepositoryLoader()
-	branch, err := loader.ResolveBaseBranch(dir)
-	require.NoError(t, err)
-	assert.Equal(t, "master", branch)
 }
 
-func TestRepositoryLoaderResolveBaseBranchRespectsCandidatePrecedence(t *testing.T) {
-	t.Parallel()
-
-	t.Run("origin HEAD beats fallbacks", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		repo, err := ggit.PlainInit(dir, false)
-		require.NoError(t, err)
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-			plumbing.ReferenceName("refs/remotes/origin/master"),
-			plumbing.NewHash("3333333333333333333333333333333333333333"),
-		)))
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-			plumbing.NewBranchReferenceName("main"),
-			plumbing.NewHash("4444444444444444444444444444444444444444"),
-		)))
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-			plumbing.ReferenceName("refs/remotes/origin/main"),
-			plumbing.NewHash("5555555555555555555555555555555555555555"),
-		)))
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewSymbolicReference(
-			plumbing.ReferenceName("refs/remotes/origin/HEAD"),
-			plumbing.ReferenceName("refs/remotes/origin/main"),
-		)))
-
-		loader := NewRepositoryLoader()
-		branch, err := loader.ResolveBaseBranch(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "main", branch)
-	})
-
-	t.Run("remote fallback beats local fallback", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		repo, err := ggit.PlainInit(dir, false)
-		require.NoError(t, err)
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-			plumbing.ReferenceName("refs/remotes/origin/master"),
-			plumbing.NewHash("6666666666666666666666666666666666666666"),
-		)))
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-			plumbing.NewBranchReferenceName("main"),
-			plumbing.NewHash("7777777777777777777777777777777777777777"),
-		)))
-
-		loader := NewRepositoryLoader()
-		branch, err := loader.ResolveBaseBranch(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "master", branch)
-	})
-
-	t.Run("local main beats local master", func(t *testing.T) {
-		t.Parallel()
-
-		dir := t.TempDir()
-		repo, err := ggit.PlainInit(dir, false)
-		require.NoError(t, err)
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-			plumbing.NewBranchReferenceName("main"),
-			plumbing.NewHash("8888888888888888888888888888888888888888"),
-		)))
-		require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(
-			plumbing.NewBranchReferenceName("master"),
-			plumbing.NewHash("9999999999999999999999999999999999999999"),
-		)))
-
-		loader := NewRepositoryLoader()
-		branch, err := loader.ResolveBaseBranch(dir)
-		require.NoError(t, err)
-		assert.Equal(t, "main", branch)
-	})
+func setSymbolicRef(t *testing.T, repo *ggit.Repository, name, target string) {
+	t.Helper()
+	require.NoError(t, repo.Storer.SetReference(plumbing.NewSymbolicReference(
+		plumbing.ReferenceName(name),
+		plumbing.ReferenceName(target),
+	)))
 }

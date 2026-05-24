@@ -12,24 +12,44 @@ import (
 func TestNewRootCommandExecutesRunFuncAndBindsConfig(t *testing.T) {
 	t.Parallel()
 
-	cfg := viper.New()
-	called := false
+	tests := []struct {
+		name          string
+		args          []string
+		expectRepo    string
+		expectContext int
+	}{
+		{
+			name:          "binds repo path and context lines",
+			args:          []string{"--repo-path", "/tmp/repo", "--context-lines", "2"},
+			expectRepo:    "/tmp/repo",
+			expectContext: 2,
+		},
+	}
 
-	cmd, err := NewRootCommand(cfg, func() error {
-		called = true
-		return nil
-	})
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&stderr)
-	cmd.SetArgs([]string{"--repo-path", "/tmp/repo", "--context-lines", "2"})
+			cfg := viper.New()
+			called := false
 
-	err = cmd.Execute()
-	require.NoError(t, err)
-	assert.True(t, called)
-	assert.Equal(t, "/tmp/repo", cfg.GetString("repo-path"))
-	assert.Equal(t, 2, cfg.GetInt("context-lines"))
+			cmd, err := NewRootCommand(cfg, func() error {
+				called = true
+				return nil
+			})
+			require.NoError(t, err)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			cmd.SetOut(&stdout)
+			cmd.SetErr(&stderr)
+			cmd.SetArgs(tt.args)
+
+			err = cmd.Execute()
+			require.NoError(t, err)
+			assert.True(t, called)
+			assert.Equal(t, tt.expectRepo, cfg.GetString("repo-path"))
+			assert.Equal(t, tt.expectContext, cfg.GetInt("context-lines"))
+		})
+	}
 }
