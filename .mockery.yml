@@ -1,0 +1,13 @@
+all: false
+dir: "{{.InterfaceDir}}/mocks"
+filename: "{{ .InterfaceName | snakecase }}_mock.go"
+formatter: goimports
+log-level: info
+structname: "Mock{{.InterfaceName}}"
+pkgname: "mocks"
+recursive: false
+template: testify
+packages:
+  tgdiff/internal/ports:
+    config:
+      all: true
