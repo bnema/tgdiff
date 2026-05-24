@@ -38,6 +38,8 @@ Key rules:
   - applies Chroma-backed syntax tokens to rendered review lines
 - the TUI provides:
   - per-file navigation
+  - floating file find with `f`
+  - floating reference grep with `/`
   - collapsed-context expander rows
   - expand above / below / all actions
   - syntax-aware diff line rendering

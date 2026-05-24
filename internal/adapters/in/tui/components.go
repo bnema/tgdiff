@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	basechroma "github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/styles"
-	"charm.land/lipgloss/v2"
 
 	"tgdiff/internal/core"
 )
@@ -43,52 +43,85 @@ type ReviewDocument struct {
 	width int
 }
 
+type ReviewDocumentRender struct {
+	Content string
+	Anchors ReviewAnchors
+}
+
+type ReviewAnchors struct {
+	FileRows map[int]int
+	LineRows map[ReviewLineAnchor]int
+}
+
+type ReviewLineAnchor struct {
+	FileIndex    int
+	SectionIndex int
+	LineIndex    int
+}
+
 func NewReviewDocument(width int) ReviewDocument {
 	return ReviewDocument{width: width}
 }
 
 func (c ReviewDocument) Render(files []core.ReviewFile, selectedContext int) string {
+	return c.RenderWithAnchors(files, -1, selectedContext).Content
+}
+
+func (c ReviewDocument) RenderWithAnchors(files []core.ReviewFile, selectedFile, selectedContext int) ReviewDocumentRender {
+	anchors := ReviewAnchors{FileRows: map[int]int{}, LineRows: map[ReviewLineAnchor]int{}}
 	if len(files) == 0 {
-		return strings.Join([]string{
+		return ReviewDocumentRender{Content: strings.Join([]string{
 			panelTitleStyle.Render("Review"),
 			mutedStyle.Render("No files to review"),
-		}, "\n")
+		}, "\n"), Anchors: anchors}
 	}
 
 	lines := make([]string, 0)
-	contextOrdinal := 0
+	selectedContextOrdinal := 0
 	for fileIndex, file := range files {
 		if fileIndex > 0 {
 			lines = append(lines, "")
 		}
+		anchors.FileRows[fileIndex] = len(lines)
 		lines = append(lines, renderFileHeader(file, c.width))
 		lines = append(lines, fileRuleStyle.Render(strings.Repeat("─", max(c.width, 1))))
 
 		numberWidth := lineNumberWidth(file)
 		expander := NewContextExpander(c.width)
-		for _, section := range file.Sections {
+		for sectionIndex, section := range file.Sections {
+			selected := false
+			if fileIndex == selectedFile && section.Kind == core.SectionKindContext && section.HiddenLineCount() > 0 {
+				selected = selectedContextOrdinal == selectedContext
+				selectedContextOrdinal++
+			}
 			switch section.Kind {
 			case core.SectionKindChanged:
-				for _, line := range section.VisibleLines() {
+				for lineIndex, line := range section.VisibleLines() {
+					anchors.LineRows[ReviewLineAnchor{FileIndex: fileIndex, SectionIndex: sectionIndex, LineIndex: lineIndex}] = len(lines)
 					lines = append(lines, formatReviewLine(line, numberWidth))
 				}
 			case core.SectionKindContext:
-				above, below := splitContextSection(section)
-				for _, line := range above {
-					lines = append(lines, formatReviewLine(line, numberWidth))
+				// Context anchors use section.Lines indexes. Hidden lines intentionally
+				// have no row until a jump expands their section and re-renders anchors.
+				aboveCount := min(section.ExpandedAbove, len(section.Lines))
+				for lineIndex := range aboveCount {
+					anchors.LineRows[ReviewLineAnchor{FileIndex: fileIndex, SectionIndex: sectionIndex, LineIndex: lineIndex}] = len(lines)
+					lines = append(lines, formatReviewLine(section.Lines[lineIndex], numberWidth))
 				}
 				if hidden := section.HiddenLineCount(); hidden > 0 {
-					lines = append(lines, expander.Render(hidden, contextOrdinal == selectedContext))
+					lines = append(lines, expander.Render(hidden, selected))
 				}
-				for _, line := range below {
-					lines = append(lines, formatReviewLine(line, numberWidth))
+				belowCount := min(section.ExpandedBelow, len(section.Lines)-aboveCount)
+				belowStart := len(section.Lines) - belowCount
+				for lineIndex := belowStart; lineIndex < len(section.Lines); lineIndex++ {
+					anchors.LineRows[ReviewLineAnchor{FileIndex: fileIndex, SectionIndex: sectionIndex, LineIndex: lineIndex}] = len(lines)
+					lines = append(lines, formatReviewLine(section.Lines[lineIndex], numberWidth))
 				}
-				contextOrdinal++
 			}
 		}
 	}
 
-	return strings.Join(lines, "\n")
+	return ReviewDocumentRender{Content: strings.Join(lines, "\n"), Anchors: anchors}
 }
 
 func renderFileHeader(file core.ReviewFile, width int) string {
@@ -137,6 +170,7 @@ type StatusModel struct {
 	Mode          string
 	FileCount     int
 	ScrollPercent float64
+	SearchActive  bool
 }
 
 type StatusBar struct {
@@ -157,8 +191,17 @@ func (c StatusBar) Render(model StatusModel) string {
 	)
 	hints := []KeyHint{
 		{Key: "↑↓/j/k", Label: "scroll"},
+		{Key: "f", Label: "find"},
+		{Key: "/", Label: "grep"},
 		{Key: "a/b", Label: "expand"},
 		{Key: "q", Label: "quit"},
+	}
+	if model.SearchActive {
+		hints = []KeyHint{
+			{Key: "↑↓", Label: "select"},
+			{Key: "enter", Label: "jump"},
+			{Key: "esc", Label: "cancel"},
+		}
 	}
 	right := renderKeyHints(hints)
 	gap := max(width-lipgloss.Width(left)-lipgloss.Width(right), 1)
@@ -296,27 +339,6 @@ func styleForToken(tokenType core.SemanticTokenType) lipgloss.Style {
 	default:
 		return lipgloss.NewStyle()
 	}
-}
-
-func splitContextSection(section core.ReviewSection) (above []core.ReviewLine, below []core.ReviewLine) {
-	if section.Kind != core.SectionKindContext {
-		return nil, nil
-	}
-	if section.HiddenLineCount() == 0 {
-		return section.VisibleLines(), nil
-	}
-
-	aboveCount := min(section.ExpandedAbove, len(section.Lines))
-	if aboveCount > 0 {
-		above = append(above, section.Lines[:aboveCount]...)
-	}
-
-	belowCount := min(section.ExpandedBelow, len(section.Lines)-aboveCount)
-	if belowCount > 0 {
-		below = append(below, section.Lines[len(section.Lines)-belowCount:]...)
-	}
-
-	return above, below
 }
 
 func lineNumberWidth(file core.ReviewFile) int {

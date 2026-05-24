@@ -24,6 +24,8 @@ type Model struct {
 	width           int
 	height          int
 	reviewViewport  viewport.Model
+	reviewAnchors   ReviewAnchors
+	search          searchState
 }
 
 func NewModel(files []core.ReviewFile) Model {
@@ -34,6 +36,7 @@ func NewModel(files []core.ReviewFile) Model {
 		width:           defaultWidth,
 		height:          defaultHeight,
 		reviewViewport:  viewport.New(),
+		search:          newSearchState(),
 	}
 	m.reviewViewport.SoftWrap = false
 	m.resetContextSelection()
@@ -53,6 +56,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncReviewViewport()
 		return m, nil
 	case tea.KeyPressMsg:
+		if m.search.active() {
+			return m.updateSearch(msg)
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -68,6 +74,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reviewViewport.GotoTop()
 		case "end":
 			m.reviewViewport.GotoBottom()
+		case "f":
+			return m.openSearch(searchModeFiles)
+		case "/":
+			return m.openSearch(searchModeGrep)
 		case "left", "h", "p":
 			m.moveFile(-1)
 		case "right", "l", "n":
@@ -90,15 +100,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
+	mode := "review"
+	if m.search.active() {
+		mode = string(m.search.mode)
+	}
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		m.reviewViewport.View(),
 		NewStatusBar(m.width).Render(StatusModel{
 			AppName:       m.title,
-			Mode:          "review",
+			Mode:          mode,
 			FileCount:     len(m.files),
 			ScrollPercent: m.reviewViewport.ScrollPercent(),
+			SearchActive:  m.search.active(),
 		}),
 	)
+	if m.search.active() {
+		content = m.renderSearchOverlay(content)
+	}
 	view := tea.NewView(content)
 	view.AltScreen = true
 	return view
@@ -219,11 +237,12 @@ func (m *Model) selectedContextSection() *core.ReviewSection {
 func (m *Model) syncReviewViewport() {
 	width := m.reviewWidth()
 	height := max(m.height-1, 1)
-	content := NewReviewDocument(width).Render(m.files, m.selectedContext)
+	rendered := NewReviewDocument(width).RenderWithAnchors(m.files, m.selectedFile, m.selectedContext)
 	currentOffset := m.reviewViewport.YOffset()
 	m.reviewViewport.SetWidth(width)
 	m.reviewViewport.SetHeight(height)
-	m.reviewViewport.SetContent(content)
+	m.reviewViewport.SetContent(rendered.Content)
+	m.reviewAnchors = rendered.Anchors
 	m.reviewViewport.SetYOffset(currentOffset)
 }
 

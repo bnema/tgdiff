@@ -144,8 +144,9 @@ Put reusable pieces under `internal/adapters/in/tui/component/`.
 
 Initial components:
 
-- `filelist` — changed files navigation and stats
+- `filelist` — changed files navigation and stats (standby; current TUI keeps one sequential viewport)
 - `reviewpane` — current file review sections
+- `searchpane` — floating file-find (`f`) and reference grep (`/`) over the review viewport
 - `contextbar` — expand above / below / all controls
 - `statusbar` — mode, file counts, branch info, hints
 - `help` — key bindings and action descriptions
@@ -238,6 +239,7 @@ Included:
 - GitHub-style per-file review sections
 - collapsible unchanged context with explicit expansion actions
 - unified review rendering in TUI
+- floating file find and reference grep with jump-to-result behavior
 - syntax coloring for displayed code
 - inline character highlights for paired add/delete lines
 
