@@ -12,6 +12,14 @@ import (
 	"tgdiff/internal/core"
 )
 
+func TestModelViewUsesAlternateScreen(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel([]core.ReviewFile{reviewFile("demo.go", "package main")})
+
+	assert.True(t, model.View().AltScreen)
+}
+
 func TestModelViewRendersSequentialReviewDocumentWithoutFileExplorer(t *testing.T) {
 	t.Parallel()
 
@@ -93,6 +101,29 @@ func TestFormatReviewLineAppliesSyntaxHighlightingAndLineNumbers(t *testing.T) {
 	assert.Contains(t, rendered, "func")
 	assert.Contains(t, rendered, "main")
 	assert.Contains(t, rendered, "\x1b[")
+}
+
+func TestFormatReviewLinePreservesDiffBackgroundWithSyntaxHighlighting(t *testing.T) {
+	t.Parallel()
+
+	line := core.ReviewLine{
+		NewLineNumber: 5,
+		Content:       "func main() {}",
+		Kind:          core.LineKindAdded,
+		SyntaxTokens: []core.SyntaxToken{
+			{Start: 0, End: 4, Type: core.SemanticTokenText, ChromaType: "KeywordDeclaration"},
+			{Start: 5, End: 9, Type: core.SemanticTokenText, ChromaType: "NameFunction"},
+		},
+	}
+
+	rendered := formatReviewLine(line, 4)
+
+	assert.Contains(t, rendered, "48;2;1;18;9", "added-line background should be very faded")
+	assert.Contains(t, rendered, "38;2;255;123;114", "keyword should use Chroma github-dark syntax foreground")
+	assert.Contains(t, rendered, "38;2;210;168;255", "function should use Chroma github-dark syntax foreground")
+	assert.NotContains(t, rendered, "48;2;3;47;23", "old diff green is still too visually heavy")
+	assert.NotContains(t, rendered, "48;2;218;251;225", "light GitHub green background dominates dark terminals")
+	assert.Contains(t, stripANSI(rendered), "+ func main() {}")
 }
 
 func TestModelUpdateKeepsExpanderFocusVisibleAfterSectionExpands(t *testing.T) {

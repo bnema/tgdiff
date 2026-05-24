@@ -16,7 +16,8 @@ const (
 )
 
 type SyntaxToken struct {
-	Start int
-	End   int
-	Type  SemanticTokenType
+	Start      int
+	End        int
+	Type       SemanticTokenType
+	ChromaType string
 }

@@ -54,6 +54,23 @@ func TestTokenizerTokenizeMapsSemanticTypes(t *testing.T) {
 	assert.Equal(t, core.SemanticTokenKeyword, tokens[0][0].Type)
 }
 
+func TestTokenizerTokenizePreservesFullChromaTokenType(t *testing.T) {
+	t.Parallel()
+
+	tokenizer := NewTokenizer()
+	tokens, err := tokenizer.Tokenize("main.go", []string{"func main() {", "\treturn", "}"})
+	require.NoError(t, err)
+	require.Len(t, tokens, 3)
+	require.NotEmpty(t, tokens[0])
+
+	var tokenTypes []string
+	for _, token := range tokens[0] {
+		tokenTypes = append(tokenTypes, token.ChromaType)
+	}
+	assert.Contains(t, tokenTypes, "KeywordDeclaration")
+	assert.Contains(t, tokenTypes, "NameFunction")
+}
+
 func TestTokenizerTokenizePropagatesLexerErrors(t *testing.T) {
 	t.Parallel()
 

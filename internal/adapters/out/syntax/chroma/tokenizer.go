@@ -43,7 +43,8 @@ func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxTo
 
 	for token := iterator(); token != basechroma.EOF; token = iterator() {
 		value := token.Value
-		semanticType := SemanticTokenTypeFromChroma(token.Type.String())
+		chromaType := token.Type.String()
+		semanticType := SemanticTokenTypeFromChroma(chromaType)
 
 		for len(value) > 0 {
 			if lineIndex >= len(lines) {
@@ -55,9 +56,10 @@ func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxTo
 				if len(value) > 0 {
 					runeLen := len([]rune(value))
 					result[lineIndex] = append(result[lineIndex], core.SyntaxToken{
-						Start: lineOffset,
-						End:   lineOffset + runeLen,
-						Type:  semanticType,
+						Start:      lineOffset,
+						End:        lineOffset + runeLen,
+						Type:       semanticType,
+						ChromaType: chromaType,
 					})
 					lineOffset += runeLen
 				}
@@ -68,9 +70,10 @@ func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxTo
 			if len(beforeNewline) > 0 {
 				runeLen := len([]rune(beforeNewline))
 				result[lineIndex] = append(result[lineIndex], core.SyntaxToken{
-					Start: lineOffset,
-					End:   lineOffset + runeLen,
-					Type:  semanticType,
+					Start:      lineOffset,
+					End:        lineOffset + runeLen,
+					Type:       semanticType,
+					ChromaType: chromaType,
 				})
 			}
 

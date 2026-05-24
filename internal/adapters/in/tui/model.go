@@ -99,7 +99,9 @@ func (m Model) View() tea.View {
 			ScrollPercent: m.reviewViewport.ScrollPercent(),
 		}),
 	)
-	return tea.NewView(content)
+	view := tea.NewView(content)
+	view.AltScreen = true
+	return view
 }
 
 func (m *Model) moveFile(delta int) {

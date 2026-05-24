@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	basechroma "github.com/alecthomas/chroma/v2"
+	"github.com/alecthomas/chroma/v2/styles"
 	"charm.land/lipgloss/v2"
 
 	"tgdiff/internal/core"
@@ -14,19 +16,21 @@ var (
 	fileRuleStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	panelTitleStyle     = lipgloss.NewStyle().Bold(true).Underline(true)
 	mutedStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	addedMarkerStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	deletedMarkerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
-	lineNumberStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-	selectedExpander    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
-	keywordStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("13"))
-	functionStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
-	typeStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
-	nameStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
-	stringStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
-	numberStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
-	commentStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true)
-	operatorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("13"))
-	punctuationStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+	addedLineStyle      = lipgloss.NewStyle().Background(lipgloss.Color("#011209")).Foreground(lipgloss.Color("#c9d1d9"))
+	deletedLineStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#1f0101")).Foreground(lipgloss.Color("#c9d1d9"))
+	addedMarkerStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#3fb950")).Bold(true)
+	deletedMarkerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff7b72")).Bold(true)
+	lineNumberStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#8b949e"))
+	selectedExpander    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#58a6ff"))
+	keywordStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff7b72"))
+	functionStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#d2a8ff"))
+	typeStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffa657"))
+	nameStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("#c9d1d9"))
+	stringStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("#a5d6ff"))
+	numberStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("#79c0ff"))
+	commentStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("#8b949e")).Italic(true)
+	operatorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff7b72"))
+	punctuationStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#c9d1d9"))
 	statusBaseStyle     = lipgloss.NewStyle().Background(lipgloss.Color("236")).Foreground(lipgloss.Color("252"))
 	statusAppStyle      = statusBaseStyle.Bold(true).Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230")).Padding(0, 1)
 	statusModeStyle     = statusBaseStyle.Foreground(lipgloss.Color("229")).Padding(0, 1)
@@ -187,28 +191,32 @@ func formatReviewLine(line core.ReviewLine, lineNumberWidth int) string {
 	newNum := lineNumberStyle.Render(formatLineNumber(line.NewLineNumber, lineNumberWidth))
 	marker := " "
 	markerStyle := lipgloss.NewStyle()
+	lineStyle := lipgloss.NewStyle()
 
 	switch line.Kind {
 	case core.LineKindAdded:
 		marker = "+"
 		markerStyle = addedMarkerStyle
+		lineStyle = addedLineStyle
 	case core.LineKindDeleted:
 		marker = "-"
 		markerStyle = deletedMarkerStyle
+		lineStyle = deletedLineStyle
 	}
 
-	content := applySyntaxHighlighting(line.Content, line.SyntaxTokens)
-	return fmt.Sprintf("%s %s %s %s", oldNum, newNum, markerStyle.Render(marker), content)
+	content := applySyntaxHighlighting(line.Content, line.SyntaxTokens, lineStyle)
+	return fmt.Sprintf("%s %s %s %s", oldNum, newNum, markerStyle.Inherit(lineStyle).Render(marker), content)
 }
 
-func applySyntaxHighlighting(content string, tokens []core.SyntaxToken) string {
+func applySyntaxHighlighting(content string, tokens []core.SyntaxToken, baseStyle lipgloss.Style) string {
 	if len(tokens) == 0 {
-		return content
+		return baseStyle.Render(content)
 	}
 
 	runes := []rune(content)
 	var result strings.Builder
 	lastEnd := 0
+	background := baseStyle.GetBackground()
 
 	for _, token := range tokens {
 		start := min(max(token.Start, 0), len(runes))
@@ -217,17 +225,52 @@ func applySyntaxHighlighting(content string, tokens []core.SyntaxToken) string {
 			continue
 		}
 		if start > lastEnd {
-			result.WriteString(string(runes[lastEnd:start]))
+			result.WriteString(baseStyle.Render(string(runes[lastEnd:start])))
 		}
-		result.WriteString(styleForToken(token.Type).Render(string(runes[start:end])))
+		tokenStyle := styleForSyntaxToken(token)
+		if background != nil {
+			tokenStyle = tokenStyle.Background(background)
+		}
+		result.WriteString(tokenStyle.Render(string(runes[start:end])))
 		lastEnd = end
 	}
 
 	if lastEnd < len(runes) {
-		result.WriteString(string(runes[lastEnd:]))
+		result.WriteString(baseStyle.Render(string(runes[lastEnd:])))
 	}
 
 	return result.String()
+}
+
+func styleForSyntaxToken(token core.SyntaxToken) lipgloss.Style {
+	if token.ChromaType != "" {
+		if tokenType, err := basechroma.TokenTypeString(token.ChromaType); err == nil {
+			entry := githubDarkStyle().Get(tokenType)
+			style := lipgloss.NewStyle()
+			if entry.Colour.IsSet() {
+				style = style.Foreground(lipgloss.Color(entry.Colour.String()))
+			}
+			if entry.Bold == basechroma.Yes {
+				style = style.Bold(true)
+			}
+			if entry.Italic == basechroma.Yes {
+				style = style.Italic(true)
+			}
+			if entry.Underline == basechroma.Yes {
+				style = style.Underline(true)
+			}
+			return style
+		}
+	}
+	return styleForToken(token.Type)
+}
+
+func githubDarkStyle() *basechroma.Style {
+	style := styles.Get("github-dark")
+	if style == nil {
+		return styles.Fallback
+	}
+	return style
 }
 
 func styleForToken(tokenType core.SemanticTokenType) lipgloss.Style {
