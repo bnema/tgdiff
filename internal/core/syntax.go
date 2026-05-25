@@ -1,23 +1,20 @@
 package core
 
-type SemanticTokenType string
+import "tgdiff/internal/ports"
+
+type SemanticTokenType = ports.SemanticTokenType
 
 const (
-	SemanticTokenKeyword     SemanticTokenType = "keyword"
-	SemanticTokenFunction    SemanticTokenType = "function"
-	SemanticTokenTypeName    SemanticTokenType = "type"
-	SemanticTokenName        SemanticTokenType = "name"
-	SemanticTokenString      SemanticTokenType = "string"
-	SemanticTokenNumber      SemanticTokenType = "number"
-	SemanticTokenComment     SemanticTokenType = "comment"
-	SemanticTokenOperator    SemanticTokenType = "operator"
-	SemanticTokenPunctuation SemanticTokenType = "punctuation"
-	SemanticTokenText        SemanticTokenType = "text"
+	SemanticTokenKeyword     = ports.SemanticTokenKeyword
+	SemanticTokenFunction    = ports.SemanticTokenFunction
+	SemanticTokenTypeName    = ports.SemanticTokenTypeName
+	SemanticTokenName        = ports.SemanticTokenName
+	SemanticTokenString      = ports.SemanticTokenString
+	SemanticTokenNumber      = ports.SemanticTokenNumber
+	SemanticTokenComment     = ports.SemanticTokenComment
+	SemanticTokenOperator    = ports.SemanticTokenOperator
+	SemanticTokenPunctuation = ports.SemanticTokenPunctuation
+	SemanticTokenText        = ports.SemanticTokenText
 )
 
-type SyntaxToken struct {
-	Start      int
-	End        int
-	Type       SemanticTokenType
-	ChromaType string
-}
+type SyntaxToken = ports.SyntaxToken

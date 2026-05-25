@@ -34,8 +34,8 @@ func (m Model) updateSearch(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 		m.moveSearchSelection(1)
 		return m, nil
 	case "enter":
-		m.acceptSearchResult()
-		return m, nil
+		cmd := m.acceptSearchResult()
+		return m, cmd
 	}
 
 	var cmd tea.Cmd
@@ -44,10 +44,10 @@ func (m Model) updateSearch(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *Model) acceptSearchResult() {
+func (m *Model) acceptSearchResult() tea.Cmd {
 	results := m.searchResults()
 	if len(results) == 0 {
-		return
+		return nil
 	}
 	result := results[min(max(m.search.selected, 0), len(results)-1)]
 	switch m.search.mode {
@@ -56,9 +56,30 @@ func (m *Model) acceptSearchResult() {
 	case searchModeGrep:
 		m.jumpToLine(result)
 	case searchModeDiff:
-		m.diffMode = result.DiffMode
+		m.closeSearch()
+		return m.loadDiffMode(result.DiffMode)
 	}
 	m.closeSearch()
+	return nil
+}
+
+func (m *Model) loadDiffMode(mode core.DiffMode) tea.Cmd {
+	if m.loading || m.loader == nil || mode == m.diffMode {
+		return nil
+	}
+	previousMode := m.request.DiffMode
+	m.diffMode = mode
+	m.loadError = ""
+	m.loading = true
+	request := m.request
+	request.DiffMode = mode
+	return func() tea.Msg {
+		files, err := m.loader.LoadReview(request)
+		if err != nil {
+			return reviewLoadFailedMsg{previousMode: previousMode, err: err}
+		}
+		return reviewLoadedMsg{mode: mode, files: files}
+	}
 }
 
 func (m *Model) jumpToFile(fileIndex int) {

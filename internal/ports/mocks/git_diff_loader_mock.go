@@ -100,3 +100,387 @@ func (_c *MockGitDiffLoader_LoadBranchDiff_Call) RunAndReturn(run func(repoPath 
 	_c.Call.Return(run)
 	return _c
 }
+
+// LoadCommitDiff provides a mock function for the type MockGitDiffLoader
+func (_mock *MockGitDiffLoader) LoadCommitDiff(repoPath string, revision string) (string, error) {
+	ret := _mock.Called(repoPath, revision)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LoadCommitDiff")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) (string, error)); ok {
+		return returnFunc(repoPath, revision)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = returnFunc(repoPath, revision)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = returnFunc(repoPath, revision)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitDiffLoader_LoadCommitDiff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadCommitDiff'
+type MockGitDiffLoader_LoadCommitDiff_Call struct {
+	*mock.Call
+}
+
+// LoadCommitDiff is a helper method to define mock.On call
+//   - repoPath string
+//   - revision string
+func (_e *MockGitDiffLoader_Expecter) LoadCommitDiff(repoPath interface{}, revision interface{}) *MockGitDiffLoader_LoadCommitDiff_Call {
+	return &MockGitDiffLoader_LoadCommitDiff_Call{Call: _e.mock.On("LoadCommitDiff", repoPath, revision)}
+}
+
+func (_c *MockGitDiffLoader_LoadCommitDiff_Call) Run(run func(repoPath string, revision string)) *MockGitDiffLoader_LoadCommitDiff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadCommitDiff_Call) Return(s string, err error) *MockGitDiffLoader_LoadCommitDiff_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadCommitDiff_Call) RunAndReturn(run func(repoPath string, revision string) (string, error)) *MockGitDiffLoader_LoadCommitDiff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LoadLocalDiff provides a mock function for the type MockGitDiffLoader
+func (_mock *MockGitDiffLoader) LoadLocalDiff(repoPath string) (string, error) {
+	ret := _mock.Called(repoPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LoadLocalDiff")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(repoPath)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(repoPath)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(repoPath)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitDiffLoader_LoadLocalDiff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadLocalDiff'
+type MockGitDiffLoader_LoadLocalDiff_Call struct {
+	*mock.Call
+}
+
+// LoadLocalDiff is a helper method to define mock.On call
+//   - repoPath string
+func (_e *MockGitDiffLoader_Expecter) LoadLocalDiff(repoPath interface{}) *MockGitDiffLoader_LoadLocalDiff_Call {
+	return &MockGitDiffLoader_LoadLocalDiff_Call{Call: _e.mock.On("LoadLocalDiff", repoPath)}
+}
+
+func (_c *MockGitDiffLoader_LoadLocalDiff_Call) Run(run func(repoPath string)) *MockGitDiffLoader_LoadLocalDiff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadLocalDiff_Call) Return(s string, err error) *MockGitDiffLoader_LoadLocalDiff_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadLocalDiff_Call) RunAndReturn(run func(repoPath string) (string, error)) *MockGitDiffLoader_LoadLocalDiff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LoadRangeDiff provides a mock function for the type MockGitDiffLoader
+func (_mock *MockGitDiffLoader) LoadRangeDiff(repoPath string, baseRevision string, headRevision string) (string, error) {
+	ret := _mock.Called(repoPath, baseRevision, headRevision)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LoadRangeDiff")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string, string) (string, error)); ok {
+		return returnFunc(repoPath, baseRevision, headRevision)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, string, string) string); ok {
+		r0 = returnFunc(repoPath, baseRevision, headRevision)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = returnFunc(repoPath, baseRevision, headRevision)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitDiffLoader_LoadRangeDiff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadRangeDiff'
+type MockGitDiffLoader_LoadRangeDiff_Call struct {
+	*mock.Call
+}
+
+// LoadRangeDiff is a helper method to define mock.On call
+//   - repoPath string
+//   - baseRevision string
+//   - headRevision string
+func (_e *MockGitDiffLoader_Expecter) LoadRangeDiff(repoPath interface{}, baseRevision interface{}, headRevision interface{}) *MockGitDiffLoader_LoadRangeDiff_Call {
+	return &MockGitDiffLoader_LoadRangeDiff_Call{Call: _e.mock.On("LoadRangeDiff", repoPath, baseRevision, headRevision)}
+}
+
+func (_c *MockGitDiffLoader_LoadRangeDiff_Call) Run(run func(repoPath string, baseRevision string, headRevision string)) *MockGitDiffLoader_LoadRangeDiff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadRangeDiff_Call) Return(s string, err error) *MockGitDiffLoader_LoadRangeDiff_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadRangeDiff_Call) RunAndReturn(run func(repoPath string, baseRevision string, headRevision string) (string, error)) *MockGitDiffLoader_LoadRangeDiff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LoadStagedDiff provides a mock function for the type MockGitDiffLoader
+func (_mock *MockGitDiffLoader) LoadStagedDiff(repoPath string) (string, error) {
+	ret := _mock.Called(repoPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LoadStagedDiff")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(repoPath)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(repoPath)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(repoPath)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitDiffLoader_LoadStagedDiff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadStagedDiff'
+type MockGitDiffLoader_LoadStagedDiff_Call struct {
+	*mock.Call
+}
+
+// LoadStagedDiff is a helper method to define mock.On call
+//   - repoPath string
+func (_e *MockGitDiffLoader_Expecter) LoadStagedDiff(repoPath interface{}) *MockGitDiffLoader_LoadStagedDiff_Call {
+	return &MockGitDiffLoader_LoadStagedDiff_Call{Call: _e.mock.On("LoadStagedDiff", repoPath)}
+}
+
+func (_c *MockGitDiffLoader_LoadStagedDiff_Call) Run(run func(repoPath string)) *MockGitDiffLoader_LoadStagedDiff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadStagedDiff_Call) Return(s string, err error) *MockGitDiffLoader_LoadStagedDiff_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadStagedDiff_Call) RunAndReturn(run func(repoPath string) (string, error)) *MockGitDiffLoader_LoadStagedDiff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LoadUpstreamDiff provides a mock function for the type MockGitDiffLoader
+func (_mock *MockGitDiffLoader) LoadUpstreamDiff(repoPath string, upstreamRef string) (string, error) {
+	ret := _mock.Called(repoPath, upstreamRef)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LoadUpstreamDiff")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string) (string, error)); ok {
+		return returnFunc(repoPath, upstreamRef)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = returnFunc(repoPath, upstreamRef)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = returnFunc(repoPath, upstreamRef)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitDiffLoader_LoadUpstreamDiff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadUpstreamDiff'
+type MockGitDiffLoader_LoadUpstreamDiff_Call struct {
+	*mock.Call
+}
+
+// LoadUpstreamDiff is a helper method to define mock.On call
+//   - repoPath string
+//   - upstreamRef string
+func (_e *MockGitDiffLoader_Expecter) LoadUpstreamDiff(repoPath interface{}, upstreamRef interface{}) *MockGitDiffLoader_LoadUpstreamDiff_Call {
+	return &MockGitDiffLoader_LoadUpstreamDiff_Call{Call: _e.mock.On("LoadUpstreamDiff", repoPath, upstreamRef)}
+}
+
+func (_c *MockGitDiffLoader_LoadUpstreamDiff_Call) Run(run func(repoPath string, upstreamRef string)) *MockGitDiffLoader_LoadUpstreamDiff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadUpstreamDiff_Call) Return(s string, err error) *MockGitDiffLoader_LoadUpstreamDiff_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadUpstreamDiff_Call) RunAndReturn(run func(repoPath string, upstreamRef string) (string, error)) *MockGitDiffLoader_LoadUpstreamDiff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LoadWorkingTreeDiff provides a mock function for the type MockGitDiffLoader
+func (_mock *MockGitDiffLoader) LoadWorkingTreeDiff(repoPath string) (string, error) {
+	ret := _mock.Called(repoPath)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LoadWorkingTreeDiff")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(repoPath)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(repoPath)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(repoPath)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitDiffLoader_LoadWorkingTreeDiff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LoadWorkingTreeDiff'
+type MockGitDiffLoader_LoadWorkingTreeDiff_Call struct {
+	*mock.Call
+}
+
+// LoadWorkingTreeDiff is a helper method to define mock.On call
+//   - repoPath string
+func (_e *MockGitDiffLoader_Expecter) LoadWorkingTreeDiff(repoPath interface{}) *MockGitDiffLoader_LoadWorkingTreeDiff_Call {
+	return &MockGitDiffLoader_LoadWorkingTreeDiff_Call{Call: _e.mock.On("LoadWorkingTreeDiff", repoPath)}
+}
+
+func (_c *MockGitDiffLoader_LoadWorkingTreeDiff_Call) Run(run func(repoPath string)) *MockGitDiffLoader_LoadWorkingTreeDiff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadWorkingTreeDiff_Call) Return(s string, err error) *MockGitDiffLoader_LoadWorkingTreeDiff_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockGitDiffLoader_LoadWorkingTreeDiff_Call) RunAndReturn(run func(repoPath string) (string, error)) *MockGitDiffLoader_LoadWorkingTreeDiff_Call {
+	_c.Call.Return(run)
+	return _c
+}

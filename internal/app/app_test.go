@@ -79,6 +79,7 @@ func TestRunLoadsReviewAndRunsTUIWithConfig(t *testing.T) {
 
 			assert.Equal(t, tt.expectRepo, loader.repoPath)
 			assert.Equal(t, tt.expectContext, loader.contextLines)
+			assert.Equal(t, core.DiffModeBranch, loader.diffMode)
 			require.NotNil(t, runner.model)
 		})
 	}
@@ -87,12 +88,14 @@ func TestRunLoadsReviewAndRunsTUIWithConfig(t *testing.T) {
 type fakeReviewLoader struct {
 	repoPath     string
 	contextLines int
+	diffMode     core.DiffMode
 	files        []core.ReviewFile
 }
 
-func (f *fakeReviewLoader) Load(repoPath string, contextLines int) ([]core.ReviewFile, error) {
-	f.repoPath = repoPath
-	f.contextLines = contextLines
+func (f *fakeReviewLoader) LoadReview(request core.ReviewRequest) ([]core.ReviewFile, error) {
+	f.repoPath = request.RepoPath
+	f.contextLines = request.ContextLines
+	f.diffMode = request.DiffMode
 	return f.files, nil
 }
 

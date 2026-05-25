@@ -17,9 +17,27 @@ const (
 	contextStep   = 10
 )
 
+type reviewLoader interface {
+	LoadReview(request core.ReviewRequest) ([]core.ReviewFile, error)
+}
+
+type reviewLoadedMsg struct {
+	mode  core.DiffMode
+	files []core.ReviewFile
+}
+
+type reviewLoadFailedMsg struct {
+	previousMode core.DiffMode
+	err          error
+}
+
 type Model struct {
 	title           string
 	files           []core.ReviewFile
+	loader          reviewLoader
+	request         core.ReviewRequest
+	loading         bool
+	loadError       string
 	selectedFile    int
 	selectedContext int
 	width           int
@@ -27,7 +45,7 @@ type Model struct {
 	reviewViewport  viewport.Model
 	reviewAnchors   ReviewAnchors
 	activeFilePath  string
-	diffMode        DiffMode
+	diffMode        core.DiffMode
 	nerdFont        bool
 	helpActive      bool
 	search          searchState
@@ -38,14 +56,23 @@ func NewModel(files []core.ReviewFile) Model {
 }
 
 func NewModelWithTerminal(files []core.ReviewFile, terminal ports.Terminal) Model {
+	return NewModelWithLoader(files, terminal, nil, core.ReviewRequest{DiffMode: core.DiffModeBranch})
+}
+
+func NewModelWithLoader(files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest) Model {
+	if request.DiffMode == "" {
+		request.DiffMode = core.DiffModeBranch
+	}
 	m := Model{
 		title:           "tgdiff",
 		files:           sortedReviewFiles(files),
+		loader:          loader,
+		request:         request,
 		selectedContext: -1,
 		width:           defaultWidth,
 		height:          defaultHeight,
 		reviewViewport:  viewport.New(),
-		diffMode:        DiffModeBranch,
+		diffMode:        request.DiffMode,
 		nerdFont:        true,
 		search:          newSearchState(),
 	}
@@ -64,6 +91,23 @@ func (m Model) Init() tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case reviewLoadedMsg:
+		m.loading = false
+		m.loadError = ""
+		m.diffMode = msg.mode
+		m.request.DiffMode = msg.mode
+		m.files = sortedReviewFiles(msg.files)
+		m.selectedFile = 0
+		m.resetContextSelection()
+		m.reviewViewport.GotoTop()
+		m.syncReviewViewport()
+		return m, nil
+	case reviewLoadFailedMsg:
+		m.loading = false
+		m.loadError = msg.err.Error()
+		m.diffMode = msg.previousMode
+		m.request.DiffMode = msg.previousMode
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = max(msg.Width, 0)
 		m.height = max(msg.Height, 0)
@@ -138,11 +182,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
+	review := m.reviewViewport.View()
+	if m.loading {
+		review = mutedStyle.Render("Loading diff…") + "\n" + review
+	} else if m.loadError != "" {
+		review = mutedStyle.Render("Failed to load diff: "+m.loadError) + "\n" + review
+	}
 	content := lipgloss.JoinVertical(lipgloss.Left,
-		m.reviewViewport.View(),
+		review,
 		NewStatusBar(m.width).Render(StatusModel{
 			AppName:       m.title,
-			Mode:          m.diffMode.Label(m.nerdFont),
+			Mode:          diffModeLabel(m.diffMode, m.nerdFont),
 			FileCount:     len(m.files),
 			CurrentFile:   m.activeFilePath,
 			ScrollPercent: m.reviewViewport.ScrollPercent(),

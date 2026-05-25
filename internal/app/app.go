@@ -17,7 +17,7 @@ import (
 )
 
 type reviewLoader interface {
-	Load(repoPath string, contextLines int) ([]core.ReviewFile, error)
+	LoadReview(request core.ReviewRequest) ([]core.ReviewFile, error)
 }
 
 type tuiRunner interface {
@@ -25,10 +25,8 @@ type tuiRunner interface {
 }
 
 type App struct {
-	config       *viper.Viper
-	reviewLoader reviewLoader
-	runner       tuiRunner
-	root         *cobra.Command
+	config *viper.Viper
+	root   *cobra.Command
 }
 
 func New() (*App, error) {
@@ -52,21 +50,24 @@ func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, erro
 	}
 
 	root, err := cli.NewRootCommand(cfg, func() error {
-		files, err := loader.Load(cfg.GetString("repo-path"), cfg.GetInt("context-lines"))
+		initialRequest := core.ReviewRequest{
+			RepoPath:     cfg.GetString("repo-path"),
+			ContextLines: cfg.GetInt("context-lines"),
+			DiffMode:     core.DiffModeBranch,
+		}
+		files, err := loader.LoadReview(initialRequest)
 		if err != nil {
 			return err
 		}
-		return runner.Run(tui.NewModelWithTerminal(files, terminal.NewCapabilities()))
+		return runner.Run(tui.NewModelWithLoader(files, terminal.NewCapabilities(), loader, initialRequest))
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build root command: %w", err)
 	}
 
 	return &App{
-		config:       cfg,
-		reviewLoader: loader,
-		runner:       runner,
-		root:         root,
+		config: cfg,
+		root:   root,
 	}, nil
 }
 

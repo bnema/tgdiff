@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -62,6 +63,66 @@ func (l *RepositoryLoader) ResolveBaseBranch(path string) (string, error) {
 	}
 
 	return "", fmt.Errorf("resolve base branch: no origin/HEAD, origin/main, origin/master, main, or master reference found")
+}
+
+func (l *RepositoryLoader) LoadWorkingTreeDiff(path string) (string, error) {
+	return runGitDiff(path)
+}
+
+func (l *RepositoryLoader) LoadStagedDiff(path string) (string, error) {
+	return runGitDiff(path, "--staged")
+}
+
+func (l *RepositoryLoader) LoadLocalDiff(path string) (string, error) {
+	return runGitDiff(path, "HEAD")
+}
+
+func (l *RepositoryLoader) LoadUpstreamDiff(path, upstreamRef string) (string, error) {
+	return runGitDiff(path, upstreamRef+"...HEAD")
+}
+
+func (l *RepositoryLoader) LoadCommitDiff(path, revision string) (string, error) {
+	return runGit(path, "diff-tree", "--root", "--no-commit-id", "-r", "-p", "--no-ext-diff", revision)
+}
+
+func (l *RepositoryLoader) LoadRangeDiff(path, baseRevision, headRevision string) (string, error) {
+	return runGitDiff(path, baseRevision+"..."+headRevision)
+}
+
+func runGitDiff(path string, args ...string) (string, error) {
+	gitArgs := append([]string{"diff", "--no-ext-diff"}, args...)
+	return runGit(path, gitArgs...)
+}
+
+func runGit(path string, args ...string) (string, error) {
+	cleanPath, err := cleanRepositoryPath(path)
+	if err != nil {
+		return "", err
+	}
+	cmdArgs := append([]string{"-c", "color.ui=false", "-c", "color.diff=false", "-C", cleanPath}, args...)
+	cmd := exec.Command("git", cmdArgs...)
+	stderr := &strings.Builder{}
+	cmd.Stderr = stderr
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+	}
+	return string(output), nil
+}
+
+func cleanRepositoryPath(path string) (string, error) {
+	absolute, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("resolve repository path: %w", err)
+	}
+	info, err := os.Stat(absolute)
+	if err != nil {
+		return "", fmt.Errorf("read repository path: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("repository path is not a directory: %s", absolute)
+	}
+	return absolute, nil
 }
 
 func (l *RepositoryLoader) LoadBranchDiff(path, baseBranch string) (string, error) {

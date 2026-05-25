@@ -6,7 +6,7 @@ import (
 
 	basechroma "github.com/alecthomas/chroma/v2"
 
-	"tgdiff/internal/core"
+	"tgdiff/internal/ports"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,12 +40,12 @@ func TestSemanticTokenTypeFromChroma(t *testing.T) {
 	tests := []struct {
 		name     string
 		chroma   string
-		expected core.SemanticTokenType
+		expected ports.SemanticTokenType
 	}{
-		{name: "keyword", chroma: "Keyword", expected: core.SemanticTokenKeyword},
-		{name: "function", chroma: "Name.Function", expected: core.SemanticTokenFunction},
-		{name: "string", chroma: "Literal.String.Double", expected: core.SemanticTokenString},
-		{name: "text", chroma: "Text", expected: core.SemanticTokenText},
+		{name: "keyword", chroma: "Keyword", expected: ports.SemanticTokenKeyword},
+		{name: "function", chroma: "Name.Function", expected: ports.SemanticTokenFunction},
+		{name: "string", chroma: "Literal.String.Double", expected: ports.SemanticTokenString},
+		{name: "text", chroma: "Text", expected: ports.SemanticTokenText},
 	}
 
 	for _, tt := range tests {
@@ -63,9 +63,9 @@ func TestTokenizerTokenizeMapsSemanticTypes(t *testing.T) {
 		name         string
 		filename     string
 		lines        []string
-		expectedType core.SemanticTokenType
+		expectedType ports.SemanticTokenType
 	}{
-		{name: "go package keyword", filename: "main.go", lines: []string{"package main"}, expectedType: core.SemanticTokenKeyword},
+		{name: "go package keyword", filename: "main.go", lines: []string{"package main"}, expectedType: ports.SemanticTokenKeyword},
 	}
 
 	for _, tt := range tests {
@@ -111,7 +111,7 @@ func TestTokenizerTokenizePreservesFullChromaTokenType(t *testing.T) {
 
 			var tokenTypes []string
 			for _, token := range tokens[0] {
-				tokenTypes = append(tokenTypes, token.ChromaType)
+				tokenTypes = append(tokenTypes, token.SourceType)
 			}
 			for _, expectedType := range tt.expectedTypes {
 				assert.Contains(t, tokenTypes, expectedType)

@@ -7,32 +7,18 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"tgdiff/internal/ports"
 )
 
-type BaseBranchResolver interface {
-	ResolveBaseBranch(repoPath string) (string, error)
-}
-
-type GitDiffLoader interface {
-	LoadBranchDiff(repoPath, baseBranch string) (string, error)
-}
-
-type SyntaxTokenizer interface {
-	Tokenize(filename string, lines []string) ([][]SyntaxToken, error)
-}
-
-type FileContentReader interface {
-	ReadFileLines(repoPath, path string) ([]string, error)
-}
-
 type ReviewLoader struct {
-	baseBranchResolver BaseBranchResolver
-	diffLoader         GitDiffLoader
-	syntaxTokenizer    SyntaxTokenizer
-	fileContentReader  FileContentReader
+	baseBranchResolver ports.BaseBranchResolver
+	diffLoader         ports.GitDiffLoader
+	syntaxTokenizer    ports.SyntaxTokenizer
+	fileContentReader  ports.FileContentReader
 }
 
-func NewReviewLoader(baseBranchResolver BaseBranchResolver, diffLoader GitDiffLoader, syntaxTokenizer SyntaxTokenizer, fileContentReaders ...FileContentReader) *ReviewLoader {
+func NewReviewLoader(baseBranchResolver ports.BaseBranchResolver, diffLoader ports.GitDiffLoader, syntaxTokenizer ports.SyntaxTokenizer, fileContentReaders ...ports.FileContentReader) *ReviewLoader {
 	loader := &ReviewLoader{
 		baseBranchResolver: baseBranchResolver,
 		diffLoader:         diffLoader,
@@ -45,6 +31,11 @@ func NewReviewLoader(baseBranchResolver BaseBranchResolver, diffLoader GitDiffLo
 }
 
 func (l *ReviewLoader) Load(repoPath string, contextWindow int) ([]ReviewFile, error) {
+	return l.LoadReview(ReviewRequest{RepoPath: repoPath, ContextLines: contextWindow, DiffMode: DiffModeBranch})
+}
+
+// LoadReview loads review files for the requested repository, context window, and diff mode.
+func (l *ReviewLoader) LoadReview(request ReviewRequest) ([]ReviewFile, error) {
 	if l == nil {
 		return nil, fmt.Errorf("review loader is nil")
 	}
@@ -55,21 +46,16 @@ func (l *ReviewLoader) Load(repoPath string, contextWindow int) ([]ReviewFile, e
 		return nil, fmt.Errorf("diff loader is nil")
 	}
 
-	baseBranch, err := l.baseBranchResolver.ResolveBaseBranch(repoPath)
+	diff, err := l.loadDiff(request)
 	if err != nil {
-		return nil, fmt.Errorf("resolve base branch: %w", err)
-	}
-
-	diff, err := l.diffLoader.LoadBranchDiff(repoPath, baseBranch)
-	if err != nil {
-		return nil, fmt.Errorf("load branch diff: %w", err)
+		return nil, err
 	}
 
 	var files []ReviewFile
 	if l.fileContentReader != nil {
-		files, err = ParseUnifiedDiffWithFileContent(repoPath, diff, contextWindow, l.fileContentReader)
+		files, err = ParseUnifiedDiffWithFileContent(request.RepoPath, diff, request.ContextLines, l.fileContentReader)
 	} else {
-		files, err = ParseUnifiedDiff(diff, contextWindow)
+		files, err = ParseUnifiedDiff(diff, request.ContextLines)
 	}
 	if err != nil {
 		return nil, err
@@ -86,13 +72,67 @@ func (l *ReviewLoader) Load(repoPath string, contextWindow int) ([]ReviewFile, e
 	return files, nil
 }
 
+func (l *ReviewLoader) loadDiff(request ReviewRequest) (string, error) {
+	mode := request.modeOrDefault()
+	if !mode.IsValid() {
+		return "", fmt.Errorf("invalid diff mode %q", request.DiffMode)
+	}
+
+	switch mode {
+	case DiffModeBranch:
+		baseBranch, err := l.baseBranchResolver.ResolveBaseBranch(request.RepoPath)
+		if err != nil {
+			return "", fmt.Errorf("resolve base branch: %w", err)
+		}
+		diff, err := l.diffLoader.LoadBranchDiff(request.RepoPath, baseBranch)
+		if err != nil {
+			return "", fmt.Errorf("load branch diff: %w", err)
+		}
+		return diff, nil
+	case DiffModeWorking:
+		return l.diffLoader.LoadWorkingTreeDiff(request.RepoPath)
+	case DiffModeStaged:
+		return l.diffLoader.LoadStagedDiff(request.RepoPath)
+	case DiffModeLocal:
+		return l.diffLoader.LoadLocalDiff(request.RepoPath)
+	case DiffModeUpstream:
+		upstreamRef := request.UpstreamRef
+		if upstreamRef == "" {
+			upstreamRef = "@{upstream}"
+		}
+		return l.diffLoader.LoadUpstreamDiff(request.RepoPath, upstreamRef)
+	case DiffModeCommit:
+		revision := request.Revision
+		if revision == "" {
+			revision = "HEAD"
+		}
+		return l.diffLoader.LoadCommitDiff(request.RepoPath, revision)
+	case DiffModeRange:
+		baseRevision := request.BaseRevision
+		if baseRevision == "" {
+			var err error
+			baseRevision, err = l.baseBranchResolver.ResolveBaseBranch(request.RepoPath)
+			if err != nil {
+				return "", fmt.Errorf("resolve base branch: %w", err)
+			}
+		}
+		headRevision := request.HeadRevision
+		if headRevision == "" {
+			headRevision = "HEAD"
+		}
+		return l.diffLoader.LoadRangeDiff(request.RepoPath, baseRevision, headRevision)
+	default:
+		return "", fmt.Errorf("unsupported diff mode %q", mode)
+	}
+}
+
 var unifiedHunkHeaderPattern = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
 
 func ParseUnifiedDiff(diff string, contextWindow int) ([]ReviewFile, error) {
 	return parseUnifiedDiff(diff, contextWindow, nil)
 }
 
-func ParseUnifiedDiffWithFileContent(repoPath, diff string, contextWindow int, reader FileContentReader) ([]ReviewFile, error) {
+func ParseUnifiedDiffWithFileContent(repoPath, diff string, contextWindow int, reader ports.FileContentReader) ([]ReviewFile, error) {
 	if reader == nil {
 		return ParseUnifiedDiff(diff, contextWindow)
 	}
@@ -274,7 +314,7 @@ func stripDiffPathPrefix(path string) string {
 	return path
 }
 
-func applySyntaxTokens(file *ReviewFile, tokenizer SyntaxTokenizer) error {
+func applySyntaxTokens(file *ReviewFile, tokenizer ports.SyntaxTokenizer) error {
 	lineContents := make([]string, 0)
 	for _, section := range file.Sections {
 		for _, line := range section.Lines {

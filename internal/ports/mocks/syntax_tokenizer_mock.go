@@ -5,7 +5,7 @@
 package mocks
 
 import (
-	"tgdiff/internal/core"
+	"tgdiff/internal/ports"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -89,23 +89,23 @@ func (_c *MockSyntaxTokenizer_Language_Call) RunAndReturn(run func(filename stri
 }
 
 // Tokenize provides a mock function for the type MockSyntaxTokenizer
-func (_mock *MockSyntaxTokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxToken, error) {
+func (_mock *MockSyntaxTokenizer) Tokenize(filename string, lines []string) ([][]ports.SyntaxToken, error) {
 	ret := _mock.Called(filename, lines)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Tokenize")
 	}
 
-	var r0 [][]core.SyntaxToken
+	var r0 [][]ports.SyntaxToken
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, []string) ([][]core.SyntaxToken, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, []string) ([][]ports.SyntaxToken, error)); ok {
 		return returnFunc(filename, lines)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, []string) [][]core.SyntaxToken); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, []string) [][]ports.SyntaxToken); ok {
 		r0 = returnFunc(filename, lines)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([][]core.SyntaxToken)
+			r0 = ret.Get(0).([][]ports.SyntaxToken)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(string, []string) error); ok {
@@ -146,12 +146,12 @@ func (_c *MockSyntaxTokenizer_Tokenize_Call) Run(run func(filename string, lines
 	return _c
 }
 
-func (_c *MockSyntaxTokenizer_Tokenize_Call) Return(syntaxTokenss [][]core.SyntaxToken, err error) *MockSyntaxTokenizer_Tokenize_Call {
+func (_c *MockSyntaxTokenizer_Tokenize_Call) Return(syntaxTokenss [][]ports.SyntaxToken, err error) *MockSyntaxTokenizer_Tokenize_Call {
 	_c.Call.Return(syntaxTokenss, err)
 	return _c
 }
 
-func (_c *MockSyntaxTokenizer_Tokenize_Call) RunAndReturn(run func(filename string, lines []string) ([][]core.SyntaxToken, error)) *MockSyntaxTokenizer_Tokenize_Call {
+func (_c *MockSyntaxTokenizer_Tokenize_Call) RunAndReturn(run func(filename string, lines []string) ([][]ports.SyntaxToken, error)) *MockSyntaxTokenizer_Tokenize_Call {
 	_c.Call.Return(run)
 	return _c
 }

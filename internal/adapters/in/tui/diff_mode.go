@@ -1,17 +1,9 @@
 package tui
 
-import "strings"
+import (
+	"strings"
 
-type DiffMode string
-
-const (
-	DiffModeBranch   DiffMode = "branch"
-	DiffModeWorking  DiffMode = "working"
-	DiffModeStaged   DiffMode = "staged"
-	DiffModeLocal    DiffMode = "local"
-	DiffModeCommit   DiffMode = "commit"
-	DiffModeRange    DiffMode = "range"
-	DiffModeUpstream DiffMode = "upstream"
+	"tgdiff/internal/core"
 )
 
 const (
@@ -24,68 +16,64 @@ const (
 	nerdIconUpstream = "\U000f02a2"
 )
 
-var allDiffModes = []DiffMode{
-	DiffModeBranch,
-	DiffModeWorking,
-	DiffModeStaged,
-	DiffModeLocal,
-	DiffModeCommit,
-	DiffModeRange,
-	DiffModeUpstream,
+var selectableDiffModes = []core.DiffMode{
+	core.DiffModeBranch,
+	core.DiffModeWorking,
+	core.DiffModeStaged,
+	core.DiffModeLocal,
+	core.DiffModeUpstream,
+	core.DiffModeCommit,
+	core.DiffModeRange,
 }
 
-var selectableDiffModes = []DiffMode{
-	DiffModeBranch,
-}
-
-func (m DiffMode) Label(nerdFont bool) string {
-	plain := m.PlainLabel()
+func diffModeLabel(mode core.DiffMode, nerdFont bool) string {
+	plain := diffModePlainLabel(mode)
 	if !nerdFont {
 		return plain
 	}
-	icon := m.NerdFontIcon()
+	icon := diffModeNerdFontIcon(mode)
 	if icon == "" {
 		return plain
 	}
 	return icon + " " + strings.TrimSuffix(plain, " diff")
 }
 
-func (m DiffMode) PlainLabel() string {
-	switch m {
-	case DiffModeBranch:
+func diffModePlainLabel(mode core.DiffMode) string {
+	switch mode {
+	case core.DiffModeBranch:
 		return "branch diff"
-	case DiffModeWorking:
+	case core.DiffModeWorking:
 		return "working diff"
-	case DiffModeStaged:
+	case core.DiffModeStaged:
 		return "staged diff"
-	case DiffModeLocal:
+	case core.DiffModeLocal:
 		return "local diff"
-	case DiffModeCommit:
+	case core.DiffModeCommit:
 		return "commit diff"
-	case DiffModeRange:
+	case core.DiffModeRange:
 		return "range diff"
-	case DiffModeUpstream:
+	case core.DiffModeUpstream:
 		return "upstream diff"
 	default:
 		return "diff"
 	}
 }
 
-func (m DiffMode) NerdFontIcon() string {
-	switch m {
-	case DiffModeBranch:
+func diffModeNerdFontIcon(mode core.DiffMode) string {
+	switch mode {
+	case core.DiffModeBranch:
 		return nerdIconBranch
-	case DiffModeWorking:
+	case core.DiffModeWorking:
 		return nerdIconWorking
-	case DiffModeStaged:
+	case core.DiffModeStaged:
 		return nerdIconStaged
-	case DiffModeLocal:
+	case core.DiffModeLocal:
 		return nerdIconLocal
-	case DiffModeCommit:
+	case core.DiffModeCommit:
 		return nerdIconCommit
-	case DiffModeRange:
+	case core.DiffModeRange:
 		return nerdIconRange
-	case DiffModeUpstream:
+	case core.DiffModeUpstream:
 		return nerdIconUpstream
 	default:
 		return ""

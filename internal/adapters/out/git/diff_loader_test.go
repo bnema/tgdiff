@@ -112,6 +112,130 @@ func TestRepositoryLoaderLoadBranchDiff(t *testing.T) {
 	}
 }
 
+func TestRepositoryLoaderLoadsGitDiffModes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		setup    func(t *testing.T, repo *ggit.Repository, dir string) (load func(*RepositoryLoader, string) (string, error))
+		contains []string
+		excludes []string
+	}{
+		{
+			name: "working tree diff",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				writeAndCommitFile(t, repo, dir, "demo.txt", "base\n", "base commit")
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "demo.txt"), []byte("base\nworking\n"), 0o644))
+				return func(loader *RepositoryLoader, dir string) (string, error) { return loader.LoadWorkingTreeDiff(dir) }
+			},
+			contains: []string{"diff --git a/demo.txt b/demo.txt", "+working"},
+		},
+		{
+			name: "staged diff",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				writeAndCommitFile(t, repo, dir, "demo.txt", "base\n", "base commit")
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "demo.txt"), []byte("base\nstaged\n"), 0o644))
+				worktree, err := repo.Worktree()
+				require.NoError(t, err)
+				_, err = worktree.Add("demo.txt")
+				require.NoError(t, err)
+				return func(loader *RepositoryLoader, dir string) (string, error) { return loader.LoadStagedDiff(dir) }
+			},
+			contains: []string{"diff --git a/demo.txt b/demo.txt", "+staged"},
+		},
+		{
+			name: "local diff includes staged and unstaged tracked changes",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				writeAndCommitFile(t, repo, dir, "staged.txt", "base\n", "base commit")
+				writeAndCommitFile(t, repo, dir, "working.txt", "base\n", "working base")
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "staged.txt"), []byte("base\nstaged\n"), 0o644))
+				worktree, err := repo.Worktree()
+				require.NoError(t, err)
+				_, err = worktree.Add("staged.txt")
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "working.txt"), []byte("base\nworking\n"), 0o644))
+				return func(loader *RepositoryLoader, dir string) (string, error) { return loader.LoadLocalDiff(dir) }
+			},
+			contains: []string{"diff --git a/staged.txt b/staged.txt", "+staged", "diff --git a/working.txt b/working.txt", "+working"},
+		},
+		{
+			name: "upstream diff",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				baseHash := writeAndCommitFile(t, repo, dir, "demo.txt", "base\n", "base commit")
+				require.NoError(t, repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName("refs/remotes/origin/main"), baseHash)))
+				writeAndCommitFile(t, repo, dir, "demo.txt", "base\nfeature\n", "feature commit")
+				return func(loader *RepositoryLoader, dir string) (string, error) {
+					return loader.LoadUpstreamDiff(dir, "origin/main")
+				}
+			},
+			contains: []string{"diff --git a/demo.txt b/demo.txt", "+feature"},
+		},
+		{
+			name: "commit diff includes root commit contents",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				hash := writeAndCommitFile(t, repo, dir, "demo.txt", "root\n", "root commit")
+				return func(loader *RepositoryLoader, dir string) (string, error) {
+					return loader.LoadCommitDiff(dir, hash.String())
+				}
+			},
+			contains: []string{"diff --git a/demo.txt b/demo.txt", "+root"},
+		},
+		{
+			name: "range diff",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				baseHash := writeAndCommitFile(t, repo, dir, "demo.txt", "base\n", "base commit")
+				headHash := writeAndCommitFile(t, repo, dir, "demo.txt", "base\nhead\n", "head commit")
+				return func(loader *RepositoryLoader, dir string) (string, error) {
+					return loader.LoadRangeDiff(dir, baseHash.String(), headHash.String())
+				}
+			},
+			contains: []string{"diff --git a/demo.txt b/demo.txt", "+head"},
+		},
+		{
+			name: "diff output disables color",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				writeAndCommitFile(t, repo, dir, "demo.txt", "base\n", "base commit")
+				config, err := os.OpenFile(filepath.Join(dir, ".git", "config"), os.O_APPEND|os.O_WRONLY, 0)
+				require.NoError(t, err)
+				_, err = config.WriteString("\n[color]\n\tui = always\n\tdiff = always\n")
+				require.NoError(t, err)
+				require.NoError(t, config.Close())
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "demo.txt"), []byte("base\nplain\n"), 0o644))
+				return func(loader *RepositoryLoader, dir string) (string, error) { return loader.LoadWorkingTreeDiff(dir) }
+			},
+			contains: []string{"+plain"},
+			excludes: []string{"\x1b["},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := t.TempDir()
+			repo, err := ggit.PlainInit(dir, false)
+			require.NoError(t, err)
+			load := tt.setup(t, repo, dir)
+
+			diff, err := load(NewRepositoryLoader(), dir)
+			require.NoError(t, err)
+			for _, expected := range tt.contains {
+				assert.Contains(t, diff, expected)
+			}
+			for _, unexpected := range tt.excludes {
+				assert.NotContains(t, diff, unexpected)
+			}
+		})
+	}
+}
+
 func writeAndCommitFile(t *testing.T, repo *ggit.Repository, dir, name, content, message string) plumbing.Hash {
 	t.Helper()
 

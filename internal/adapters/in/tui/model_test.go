@@ -225,8 +225,8 @@ func TestFormatReviewLine(t *testing.T) {
 				Content:       "func main() {}",
 				Kind:          core.LineKindAdded,
 				SyntaxTokens: []core.SyntaxToken{
-					{Start: 0, End: 4, Type: core.SemanticTokenText, ChromaType: "KeywordDeclaration"},
-					{Start: 5, End: 9, Type: core.SemanticTokenText, ChromaType: "NameFunction"},
+					{Start: 0, End: 4, Type: core.SemanticTokenText, SourceType: "KeywordDeclaration"},
+					{Start: 5, End: 9, Type: core.SemanticTokenText, SourceType: "NameFunction"},
 				},
 			},
 			contains:    []string{"48;2;1;18;9", "38;2;255;123;114", "38;2;210;168;255"},

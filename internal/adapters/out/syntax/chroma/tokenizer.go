@@ -8,7 +8,7 @@ import (
 	basechroma "github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
 
-	"tgdiff/internal/core"
+	"tgdiff/internal/ports"
 )
 
 type Tokenizer struct {
@@ -27,8 +27,8 @@ func (t *Tokenizer) Language(filename string) string {
 	return ""
 }
 
-func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxToken, error) {
-	result := make([][]core.SyntaxToken, len(lines))
+func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]ports.SyntaxToken, error) {
+	result := make([][]ports.SyntaxToken, len(lines))
 	if len(lines) == 0 {
 		return result, nil
 	}
@@ -55,11 +55,11 @@ func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxTo
 			if newlineIndex == -1 {
 				if len(value) > 0 {
 					runeLen := len([]rune(value))
-					result[lineIndex] = append(result[lineIndex], core.SyntaxToken{
+					result[lineIndex] = append(result[lineIndex], ports.SyntaxToken{
 						Start:      lineOffset,
 						End:        lineOffset + runeLen,
 						Type:       semanticType,
-						ChromaType: chromaType,
+						SourceType: chromaType,
 					})
 					lineOffset += runeLen
 				}
@@ -69,11 +69,11 @@ func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxTo
 			beforeNewline := value[:newlineIndex]
 			if len(beforeNewline) > 0 {
 				runeLen := len([]rune(beforeNewline))
-				result[lineIndex] = append(result[lineIndex], core.SyntaxToken{
+				result[lineIndex] = append(result[lineIndex], ports.SyntaxToken{
 					Start:      lineOffset,
 					End:        lineOffset + runeLen,
 					Type:       semanticType,
-					ChromaType: chromaType,
+					SourceType: chromaType,
 				})
 			}
 
@@ -86,28 +86,28 @@ func (t *Tokenizer) Tokenize(filename string, lines []string) ([][]core.SyntaxTo
 	return result, nil
 }
 
-func SemanticTokenTypeFromChroma(tokenType string) core.SemanticTokenType {
+func SemanticTokenTypeFromChroma(tokenType string) ports.SemanticTokenType {
 	switch {
 	case strings.HasPrefix(tokenType, "Keyword"):
-		return core.SemanticTokenKeyword
+		return ports.SemanticTokenKeyword
 	case strings.HasPrefix(tokenType, "Name.Function"):
-		return core.SemanticTokenFunction
+		return ports.SemanticTokenFunction
 	case strings.HasPrefix(tokenType, "Name.Class"), strings.HasPrefix(tokenType, "Name.Builtin"):
-		return core.SemanticTokenTypeName
+		return ports.SemanticTokenTypeName
 	case strings.HasPrefix(tokenType, "Name"):
-		return core.SemanticTokenName
+		return ports.SemanticTokenName
 	case strings.HasPrefix(tokenType, "Literal.String"):
-		return core.SemanticTokenString
+		return ports.SemanticTokenString
 	case strings.HasPrefix(tokenType, "Literal.Number"):
-		return core.SemanticTokenNumber
+		return ports.SemanticTokenNumber
 	case strings.HasPrefix(tokenType, "Comment"):
-		return core.SemanticTokenComment
+		return ports.SemanticTokenComment
 	case strings.HasPrefix(tokenType, "Operator"):
-		return core.SemanticTokenOperator
+		return ports.SemanticTokenOperator
 	case strings.HasPrefix(tokenType, "Punctuation"):
-		return core.SemanticTokenPunctuation
+		return ports.SemanticTokenPunctuation
 	default:
-		return core.SemanticTokenText
+		return ports.SemanticTokenText
 	}
 }
 

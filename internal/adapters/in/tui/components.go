@@ -327,8 +327,8 @@ func applySyntaxHighlighting(content string, tokens []core.SyntaxToken, baseStyl
 }
 
 func styleForSyntaxToken(token core.SyntaxToken) lipgloss.Style {
-	if token.ChromaType != "" {
-		if tokenType, err := basechroma.TokenTypeString(token.ChromaType); err == nil {
+	if token.SourceType != "" {
+		if tokenType, err := basechroma.TokenTypeString(token.SourceType); err == nil {
 			entry := githubDarkStyle().Get(tokenType)
 			style := lipgloss.NewStyle()
 			if entry.Colour.IsSet() {
