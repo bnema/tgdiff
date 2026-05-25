@@ -169,8 +169,8 @@ type StatusModel struct {
 	AppName       string
 	Mode          string
 	FileCount     int
+	CurrentFile   string
 	ScrollPercent float64
-	SearchActive  bool
 }
 
 type StatusBar struct {
@@ -183,35 +183,62 @@ func NewStatusBar(width int) StatusBar {
 
 func (c StatusBar) Render(model StatusModel) string {
 	width := max(c.width, 1)
-	left := lipgloss.JoinHorizontal(lipgloss.Center,
-		statusAppStyle.Render(model.AppName),
-		statusModeStyle.Render(model.Mode),
-		statusInfoStyle.Render(fileCountLabel(model.FileCount)),
-		statusInfoStyle.Render(fmt.Sprintf("%3.0f%%", model.ScrollPercent*100)),
+	right := renderStatusHint(width)
+	leftWidth := max(width-lipgloss.Width(right)-1, 0)
+
+	prefix := renderStatusSegments(leftWidth,
+		statusSegment{style: statusAppStyle, label: model.AppName},
+		statusSegment{style: statusModeStyle, label: model.Mode},
+		statusSegment{style: statusInfoStyle, label: fileCountLabel(model.FileCount)},
 	)
-	hints := []KeyHint{
-		{Key: "↑↓/j/k", Label: "scroll"},
-		{Key: "f", Label: "find"},
-		{Key: "/", Label: "grep"},
-		{Key: "a/b", Label: "expand"},
-		{Key: "q", Label: "quit"},
+	percent := renderStatusSegments(leftWidth-lipgloss.Width(prefix), statusSegment{style: statusInfoStyle, label: fmt.Sprintf("%3.0f%%", model.ScrollPercent*100)})
+
+	fileWidth := leftWidth - lipgloss.Width(prefix) - lipgloss.Width(percent)
+	file := ""
+	if model.CurrentFile != "" && fileWidth > 0 {
+		file = renderStatusSegments(fileWidth, statusSegment{style: statusInfoStyle, label: model.CurrentFile})
 	}
-	if model.SearchActive {
-		hints = []KeyHint{
-			{Key: "↑↓", Label: "select"},
-			{Key: "enter", Label: "jump"},
-			{Key: "esc", Label: "cancel"},
-		}
-	}
-	right := renderKeyHints(hints)
-	gap := max(width-lipgloss.Width(left)-lipgloss.Width(right), 1)
+	left := prefix + file + percent
+	gap := max(width-lipgloss.Width(left)-lipgloss.Width(right), 0)
 	bar := left + statusBaseStyle.Render(strings.Repeat(" ", gap)) + right
 	return statusBaseStyle.Width(width).Render(bar)
+}
+
+type statusSegment struct {
+	style lipgloss.Style
+	label string
 }
 
 type KeyHint struct {
 	Key   string
 	Label string
+}
+
+func renderStatusHint(width int) string {
+	label := "? help"
+	full := renderKeyHints([]KeyHint{{Key: "?", Label: "help"}})
+	if lipgloss.Width(full) <= width {
+		return full
+	}
+	return statusInfoStyle.Render(truncateRunes(label, max(width-statusInfoStyle.GetHorizontalPadding(), 0)))
+}
+
+func renderStatusSegments(width int, segments ...statusSegment) string {
+	var rendered strings.Builder
+	for _, segment := range segments {
+		used := lipgloss.Width(rendered.String())
+		remaining := width - used
+		if remaining <= 0 {
+			break
+		}
+		padding := segment.style.GetHorizontalPadding()
+		labelWidth := remaining - padding
+		if labelWidth <= 0 {
+			continue
+		}
+		rendered.WriteString(segment.style.Render(truncateRunes(segment.label, labelWidth)))
+	}
+	return rendered.String()
 }
 
 func renderKeyHints(hints []KeyHint) string {
@@ -227,6 +254,20 @@ func fileCountLabel(count int) string {
 		return "1 file"
 	}
 	return fmt.Sprintf("%d files", count)
+}
+
+func truncateRunes(value string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	runes := []rune(value)
+	if len(runes) <= width {
+		return value
+	}
+	if width == 1 {
+		return "…"
+	}
+	return string(runes[:width-1]) + "…"
 }
 
 func formatReviewLine(line core.ReviewLine, lineNumberWidth int) string {

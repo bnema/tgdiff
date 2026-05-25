@@ -20,6 +20,7 @@ const (
 	searchModeInactive searchMode = ""
 	searchModeFiles    searchMode = "files"
 	searchModeGrep     searchMode = "grep"
+	searchModeDiff     searchMode = "diff mode"
 )
 
 type searchState struct {
@@ -46,6 +47,8 @@ func (s searchState) title() string {
 		return "Find file"
 	case searchModeGrep:
 		return "Grep references"
+	case searchModeDiff:
+		return "Switch diff mode"
 	default:
 		return "Search"
 	}

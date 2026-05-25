@@ -15,6 +15,7 @@ type SearchResult struct {
 	Path         string
 	LineNumber   int
 	Preview      string
+	DiffMode     DiffMode
 }
 
 type scoredSearchResult struct {
@@ -83,6 +84,22 @@ func grepResults(files []core.ReviewFile, query string) []SearchResult {
 				})
 			}
 		}
+	}
+	return results
+}
+
+func diffModeResults(query string, nerdFont bool) []SearchResult {
+	query = strings.TrimSpace(query)
+	results := make([]SearchResult, 0, len(selectableDiffModes))
+	for _, mode := range selectableDiffModes {
+		label := mode.Label(nerdFont)
+		if query != "" {
+			plain := mode.PlainLabel()
+			if _, ok := fuzzyScore(plain, query); !ok && !strings.Contains(strings.ToLower(label), strings.ToLower(query)) {
+				continue
+			}
+		}
+		results = append(results, SearchResult{Path: label, DiffMode: mode})
 	}
 	return results
 }

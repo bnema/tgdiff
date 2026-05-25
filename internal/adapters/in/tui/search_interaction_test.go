@@ -98,21 +98,23 @@ func TestModelOpensGrepSelectsAndCancels(t *testing.T) {
 	assert.NotContains(t, stripANSI(model.View().Content), "Grep references")
 }
 
-func TestModelSearchStatusHintsDoNotReplaceNormalHintsUntilActive(t *testing.T) {
+func TestModelStatusBarOnlyShowsHelpHint(t *testing.T) {
 	t.Parallel()
 
 	model := NewModel([]core.ReviewFile{reviewFile("demo.go", "package main")})
 	normal := stripANSI(model.View().Content)
-	assert.Contains(t, normal, "find")
-	assert.Contains(t, normal, "grep")
-	assert.Contains(t, normal, "scroll")
+	assert.Contains(t, normal, "? help")
+	assert.NotContains(t, normal, "find")
+	assert.NotContains(t, normal, "grep")
+	assert.NotContains(t, normal, "scroll")
 
 	updated, _ := model.Update(keyPress("f"))
 	model = updated.(Model)
 	active := stripANSI(model.View().Content)
-	assert.Contains(t, active, "select")
-	assert.Contains(t, active, "jump")
-	assert.Contains(t, active, "cancel")
+	assert.Contains(t, active, "? help")
+	assert.NotContains(t, active, "select")
+	assert.NotContains(t, active, "jump")
+	assert.NotContains(t, active, "cancel")
 }
 
 func keyPress(text string) tea.KeyPressMsg {

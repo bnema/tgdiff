@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"tgdiff/internal/core"
+	"tgdiff/internal/ports"
 )
 
 const (
@@ -25,10 +26,18 @@ type Model struct {
 	height          int
 	reviewViewport  viewport.Model
 	reviewAnchors   ReviewAnchors
+	activeFilePath  string
+	diffMode        DiffMode
+	nerdFont        bool
+	helpActive      bool
 	search          searchState
 }
 
 func NewModel(files []core.ReviewFile) Model {
+	return NewModelWithTerminal(files, nil)
+}
+
+func NewModelWithTerminal(files []core.ReviewFile, terminal ports.Terminal) Model {
 	m := Model{
 		title:           "tgdiff",
 		files:           sortedReviewFiles(files),
@@ -36,7 +45,12 @@ func NewModel(files []core.ReviewFile) Model {
 		width:           defaultWidth,
 		height:          defaultHeight,
 		reviewViewport:  viewport.New(),
+		diffMode:        DiffModeBranch,
+		nerdFont:        true,
 		search:          newSearchState(),
+	}
+	if terminal != nil {
+		m.nerdFont = terminal.SupportsNerdFont()
 	}
 	m.reviewViewport.SoftWrap = false
 	m.resetContextSelection()
@@ -56,28 +70,51 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.syncReviewViewport()
 		return m, nil
 	case tea.KeyPressMsg:
+		if m.helpActive {
+			switch msg.String() {
+			case "?", "esc":
+				m.helpActive = false
+				return m, nil
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			default:
+				return m, nil
+			}
+		}
 		if m.search.active() {
 			return m.updateSearch(msg)
+		}
+		if msg.String() == "?" {
+			m.helpActive = true
+			return m, nil
 		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up", "k":
 			m.reviewViewport.ScrollUp(1)
+			m.updateActiveFileFromViewport()
 		case "down", "j":
 			m.reviewViewport.ScrollDown(1)
+			m.updateActiveFileFromViewport()
 		case "pgup":
 			m.reviewViewport.PageUp()
+			m.updateActiveFileFromViewport()
 		case "pgdown":
 			m.reviewViewport.PageDown()
+			m.updateActiveFileFromViewport()
 		case "home":
 			m.reviewViewport.GotoTop()
+			m.updateActiveFileFromViewport()
 		case "end":
 			m.reviewViewport.GotoBottom()
+			m.updateActiveFileFromViewport()
 		case "f":
 			return m.openSearch(searchModeFiles)
 		case "/":
 			return m.openSearch(searchModeGrep)
+		case "d":
+			return m.openSearch(searchModeDiff)
 		case "left", "h", "p":
 			m.moveFile(-1)
 		case "right", "l", "n":
@@ -91,6 +128,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			var cmd tea.Cmd
 			m.reviewViewport, cmd = m.reviewViewport.Update(msg)
+			m.updateActiveFileFromViewport()
 			return m, cmd
 		}
 		return m, nil
@@ -100,22 +138,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
-	mode := "review"
-	if m.search.active() {
-		mode = string(m.search.mode)
-	}
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		m.reviewViewport.View(),
 		NewStatusBar(m.width).Render(StatusModel{
 			AppName:       m.title,
-			Mode:          mode,
+			Mode:          m.diffMode.Label(m.nerdFont),
 			FileCount:     len(m.files),
+			CurrentFile:   m.activeFilePath,
 			ScrollPercent: m.reviewViewport.ScrollPercent(),
-			SearchActive:  m.search.active(),
 		}),
 	)
 	if m.search.active() {
 		content = m.renderSearchOverlay(content)
+	}
+	if m.helpActive {
+		content = m.renderHelpOverlay(content)
 	}
 	view := tea.NewView(content)
 	view.AltScreen = true
@@ -244,6 +281,25 @@ func (m *Model) syncReviewViewport() {
 	m.reviewViewport.SetContent(rendered.Content)
 	m.reviewAnchors = rendered.Anchors
 	m.reviewViewport.SetYOffset(currentOffset)
+	m.updateActiveFileFromViewport()
+}
+
+func (m *Model) updateActiveFileFromViewport() {
+	if len(m.files) == 0 || len(m.reviewAnchors.FileRows) == 0 {
+		m.activeFilePath = ""
+		return
+	}
+
+	activeIndex := 0
+	activeRow := -1
+	offset := m.reviewViewport.YOffset()
+	for fileIndex, row := range m.reviewAnchors.FileRows {
+		if row <= offset && row >= activeRow {
+			activeIndex = fileIndex
+			activeRow = row
+		}
+	}
+	m.activeFilePath = m.files[activeIndex].Path
 }
 
 func (m Model) reviewWidth() int {

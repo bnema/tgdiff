@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 
 	"tgdiff/internal/adapters/in/cli"
+	"tgdiff/internal/adapters/in/terminal"
 	"tgdiff/internal/adapters/in/tui"
 	gitadapter "tgdiff/internal/adapters/out/git"
 	chromatokenizer "tgdiff/internal/adapters/out/syntax/chroma"
@@ -55,7 +56,7 @@ func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, erro
 		if err != nil {
 			return err
 		}
-		return runner.Run(tui.NewModel(files))
+		return runner.Run(tui.NewModelWithTerminal(files, terminal.NewCapabilities()))
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build root command: %w", err)

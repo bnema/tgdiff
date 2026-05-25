@@ -15,6 +15,10 @@ func (m Model) openSearch(mode searchMode) (Model, tea.Cmd) {
 	if mode == searchModeGrep {
 		m.search.input.Placeholder = "grep changed files"
 	}
+	if mode == searchModeDiff {
+		m.search.input.Placeholder = "filter diff modes"
+		m.search.selected = m.currentDiffModeIndex()
+	}
 	return m, m.search.input.Focus()
 }
 
@@ -51,6 +55,8 @@ func (m *Model) acceptSearchResult() {
 		m.jumpToFile(result.FileIndex)
 	case searchModeGrep:
 		m.jumpToLine(result)
+	case searchModeDiff:
+		m.diffMode = result.DiffMode
 	}
 	m.closeSearch()
 }
@@ -63,6 +69,7 @@ func (m *Model) jumpToFile(fileIndex int) {
 	m.resetContextSelection()
 	m.syncReviewViewport()
 	m.reviewViewport.SetYOffset(m.reviewAnchors.FileRows[fileIndex])
+	m.updateActiveFileFromViewport()
 }
 
 func (m *Model) jumpToLine(result SearchResult) {
@@ -83,6 +90,7 @@ func (m *Model) jumpToLine(result SearchResult) {
 	if row, ok := m.reviewAnchors.LineRows[anchor]; ok {
 		m.reviewViewport.SetYOffset(row)
 	}
+	m.updateActiveFileFromViewport()
 }
 
 func contextLineVisible(section core.ReviewSection, lineIndex int) bool {
@@ -131,20 +139,41 @@ func (m Model) searchResults() []SearchResult {
 		return fuzzyFileResults(m.files, m.search.query())
 	case searchModeGrep:
 		return grepResults(m.files, m.search.query())
+	case searchModeDiff:
+		return diffModeResults(m.search.query(), m.nerdFont)
 	default:
 		return nil
 	}
+}
+
+func (m Model) currentDiffModeIndex() int {
+	for i, mode := range selectableDiffModes {
+		if mode == m.diffMode {
+			return i
+		}
+	}
+	return 0
 }
 
 func (m Model) renderSearchOverlay(content string) string {
 	width := max(m.width, 1)
 	height := max(m.height, 1)
 	pane := renderSearchPane(width, height, m.search, m.searchResults())
-	paneY := min(1, max(height-lipgloss.Height(pane), 0))
+	return renderCenteredOverlay(content, pane, width, height, min(1, max(height-lipgloss.Height(pane), 0)))
+}
+
+func (m Model) renderHelpOverlay(content string) string {
+	width := max(m.width, 1)
+	height := max(m.height, 1)
+	pane := renderHelpPane(width, height)
+	return renderCenteredOverlay(content, pane, width, height, max((height-lipgloss.Height(pane))/2, 0))
+}
+
+func renderCenteredOverlay(content, pane string, width, height, y int) string {
 	canvas := lipgloss.NewCanvas(width, height)
 	compositor := lipgloss.NewCompositor(
 		lipgloss.NewLayer(content),
-		lipgloss.NewLayer(pane).X(max((width-lipgloss.Width(pane))/2, 0)).Y(paneY).Z(1),
+		lipgloss.NewLayer(pane).X(max((width-lipgloss.Width(pane))/2, 0)).Y(y).Z(1),
 	)
 	canvas.Compose(compositor)
 	return canvas.Render()

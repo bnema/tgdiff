@@ -102,6 +102,64 @@ func TestModelScrollsSequentialReviewDocumentWithJKAndArrows(t *testing.T) {
 	}
 }
 
+func TestModelStatusBarShowsActiveFileWhenScrolling(t *testing.T) {
+	t.Parallel()
+
+	model := NewModel([]core.ReviewFile{
+		reviewFileWithLines("alpha.go", 40),
+		reviewFileWithLines("beta.go", 40),
+	})
+	updated, _ := model.Update(tea.WindowSizeMsg{Width: 100, Height: 10})
+	model = updated.(Model)
+
+	assert.Contains(t, stripANSI(model.View().Content), "alpha.go")
+
+	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEnd})
+	model = updated.(Model)
+
+	assert.Contains(t, stripANSI(model.View().Content), "beta.go")
+}
+
+func TestStatusBarFitsLongModeLabelToOneLine(t *testing.T) {
+	t.Parallel()
+
+	view := stripANSI(NewStatusBar(32).Render(StatusModel{
+		AppName:       "tgdiff",
+		Mode:          "upstream diff",
+		FileCount:     42,
+		CurrentFile:   "internal/adapters/in/tui/a-very-long-file-name.go",
+		ScrollPercent: 0.42,
+	}))
+	lines := strings.Split(view, "\n")
+
+	assert.Len(t, lines, 1)
+	assert.LessOrEqual(t, len([]rune(lines[0])), 32)
+}
+
+func TestStatusBarTruncatesLongCurrentFileToOneLine(t *testing.T) {
+	t.Parallel()
+
+	model := StatusModel{
+		AppName:       "tgdiff",
+		Mode:          "review",
+		FileCount:     2,
+		CurrentFile:   "internal/adapters/in/tui/a-very-long-file-name.go",
+		ScrollPercent: 0.42,
+	}
+	wide := stripANSI(NewStatusBar(60).Render(model))
+	wideLines := strings.Split(wide, "\n")
+	assert.Len(t, wideLines, 1)
+	assert.LessOrEqual(t, len([]rune(wideLines[0])), 60)
+	assert.Contains(t, wide, "…")
+	assert.Contains(t, wide, "? help")
+
+	narrow := stripANSI(NewStatusBar(40).Render(model))
+	narrowLines := strings.Split(narrow, "\n")
+	assert.Len(t, narrowLines, 1)
+	assert.LessOrEqual(t, len([]rune(narrowLines[0])), 40)
+	assert.Contains(t, narrow, "? help")
+}
+
 func TestModelViewRendersPolishedStatusBar(t *testing.T) {
 	t.Parallel()
 
@@ -125,9 +183,10 @@ func TestModelViewRendersPolishedStatusBar(t *testing.T) {
 
 			assert.Contains(t, view, "tgdiff")
 			assert.Contains(t, view, "1 file")
-			assert.Contains(t, view, "j/k")
-			assert.Contains(t, view, "expand")
-			assert.Contains(t, view, "quit")
+			assert.Contains(t, view, "? help")
+			assert.NotContains(t, view, "j/k")
+			assert.NotContains(t, view, "expand")
+			assert.NotContains(t, view, "quit")
 			for line := range strings.SplitSeq(view, "\n") {
 				assert.LessOrEqual(t, len([]rune(line)), tt.width)
 			}
