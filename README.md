@@ -53,3 +53,16 @@ make mocks
 make install
 go run ./cmd/tgdiff --help
 ```
+
+Start modes:
+
+```bash
+tgdiff                  # working branch vs default branch
+tgdiff branch           # same as default
+tgdiff working          # unstaged working tree changes
+tgdiff staged           # staged changes
+tgdiff local            # staged + unstaged local changes
+tgdiff upstream [ref]   # against upstream, default @{upstream}
+tgdiff commit <rev>     # one commit
+tgdiff range <base> <head>
+```
