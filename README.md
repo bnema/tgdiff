@@ -57,8 +57,8 @@ go run ./cmd/tgdiff --help
 Start modes:
 
 ```bash
-tgdiff                  # working branch vs default branch
-tgdiff branch           # same as default
+tgdiff                  # smart startup detection
+tgdiff branch           # working branch vs default branch
 tgdiff working          # unstaged working tree changes
 tgdiff staged           # staged changes
 tgdiff local            # staged + unstaged local changes
@@ -66,3 +66,15 @@ tgdiff upstream [ref]   # against upstream, default @{upstream}
 tgdiff commit <rev>     # one commit
 tgdiff range <base> <head>
 ```
+
+Smart startup detection chooses the first safe review scope:
+
+1. staged + unstaged/untracked changes: prompt for Staged, Unstaged, or All local changes
+2. unstaged or untracked changes only: `working`
+3. staged changes only: `staged`
+4. local commits ahead of upstream: `upstream`
+5. no upstream but a default branch exists: `branch`
+6. behind-only, detached HEAD, or no reviewable changes: exit with a clear message
+
+When mixed local changes are detected in a non-interactive terminal, choose explicitly with
+`tgdiff staged`, `tgdiff working`, or `tgdiff local`.

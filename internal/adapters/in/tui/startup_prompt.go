@@ -1,0 +1,123 @@
+package tui
+
+import (
+	"fmt"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"tgdiff/internal/core"
+	"tgdiff/internal/ports"
+)
+
+type StartupPrompt struct {
+	terminal ports.Terminal
+}
+
+func NewStartupPrompt(terminal ports.Terminal) StartupPrompt {
+	return StartupPrompt{terminal: terminal}
+}
+
+func (p StartupPrompt) PromptLocalChangeMode() (core.DiffMode, error) {
+	model := newStartupPromptModel(p.supportsNerdFont())
+	result, err := tea.NewProgram(model).Run()
+	if err != nil {
+		return "", err
+	}
+	prompt, ok := result.(startupPromptModel)
+	if !ok {
+		return "", fmt.Errorf("unexpected startup prompt result %T", result)
+	}
+	if prompt.cancelled {
+		return "", fmt.Errorf("startup mode selection cancelled")
+	}
+	return prompt.selectedMode(), nil
+}
+
+func (p StartupPrompt) supportsNerdFont() bool {
+	if p.terminal == nil {
+		return true
+	}
+	return p.terminal.SupportsNerdFont()
+}
+
+type startupPromptOption struct {
+	mode        core.DiffMode
+	key         string
+	label       string
+	description string
+}
+
+type startupPromptModel struct {
+	options   []startupPromptOption
+	selected  int
+	cancelled bool
+	nerdFont  bool
+}
+
+func newStartupPromptModel(nerdFont bool) startupPromptModel {
+	return startupPromptModel{
+		nerdFont: nerdFont,
+		options: []startupPromptOption{
+			{mode: core.DiffModeStaged, key: "s", label: "Staged changes", description: "What will be included in your next commit"},
+			{mode: core.DiffModeWorking, key: "u", label: "Unstaged/untracked changes", description: "Worktree changes not yet staged, including new files"},
+			{mode: core.DiffModeLocal, key: "a", label: "All local changes", description: "Staged + worktree/untracked changes together"},
+		},
+	}
+}
+
+func (m startupPromptModel) Init() tea.Cmd { return nil }
+
+func (m startupPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	key, ok := msg.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil
+	}
+	switch key.String() {
+	case "q", "esc", "ctrl+c":
+		m.cancelled = true
+		return m, tea.Quit
+	case "up", "k":
+		m.selected = max(m.selected-1, 0)
+	case "down", "j":
+		m.selected = min(m.selected+1, len(m.options)-1)
+	case "s":
+		m.selected = 0
+		return m, tea.Quit
+	case "u":
+		m.selected = 1
+		return m, tea.Quit
+	case "a":
+		m.selected = 2
+		return m, tea.Quit
+	case "enter":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m startupPromptModel) View() tea.View {
+	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")).Render("Mixed local changes detected")
+	subtitle := mutedStyle.Render("Choose the diff scope to review")
+	lines := []string{title, subtitle, ""}
+	for i, option := range m.options {
+		cursor := "  "
+		labelStyle := lipgloss.NewStyle().Bold(false)
+		if i == m.selected {
+			cursor = "▸ "
+			labelStyle = labelStyle.Bold(true).Foreground(lipgloss.Color("86"))
+		}
+		shortcut := mutedStyle.Render("(" + option.key + ")")
+		lines = append(lines, cursor+labelStyle.Render(option.label)+" "+shortcut)
+		lines = append(lines, "    "+mutedStyle.Render(option.description))
+	}
+	lines = append(lines, "", mutedStyle.Render("↑/↓ move • enter select • q quit"))
+	return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, lines...))
+}
+
+func (m startupPromptModel) selectedMode() core.DiffMode {
+	if m.selected < 0 || m.selected >= len(m.options) {
+		return core.DiffModeStaged
+	}
+	return m.options[m.selected].mode
+}

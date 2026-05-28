@@ -132,6 +132,16 @@ func TestRepositoryLoaderLoadsGitDiffModes(t *testing.T) {
 			contains: []string{"diff --git a/demo.txt b/demo.txt", "+working"},
 		},
 		{
+			name: "working tree diff includes untracked files",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				writeAndCommitFile(t, repo, dir, "demo.txt", "base\n", "base commit")
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new\n"), 0o644))
+				return func(loader *RepositoryLoader, dir string) (string, error) { return loader.LoadWorkingTreeDiff(dir) }
+			},
+			contains: []string{"diff --git a/new.txt b/new.txt", "--- /dev/null", "+new"},
+		},
+		{
 			name: "staged diff",
 			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
 				t.Helper()
@@ -160,6 +170,21 @@ func TestRepositoryLoaderLoadsGitDiffModes(t *testing.T) {
 				return func(loader *RepositoryLoader, dir string) (string, error) { return loader.LoadLocalDiff(dir) }
 			},
 			contains: []string{"diff --git a/staged.txt b/staged.txt", "+staged", "diff --git a/working.txt b/working.txt", "+working"},
+		},
+		{
+			name: "local diff includes staged and untracked files",
+			setup: func(t *testing.T, repo *ggit.Repository, dir string) func(*RepositoryLoader, string) (string, error) {
+				t.Helper()
+				writeAndCommitFile(t, repo, dir, "staged.txt", "base\n", "base commit")
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "staged.txt"), []byte("base\nstaged\n"), 0o644))
+				worktree, err := repo.Worktree()
+				require.NoError(t, err)
+				_, err = worktree.Add("staged.txt")
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "new.txt"), []byte("new\n"), 0o644))
+				return func(loader *RepositoryLoader, dir string) (string, error) { return loader.LoadLocalDiff(dir) }
+			},
+			contains: []string{"diff --git a/staged.txt b/staged.txt", "+staged", "diff --git a/new.txt b/new.txt", "+new"},
 		},
 		{
 			name: "upstream diff",

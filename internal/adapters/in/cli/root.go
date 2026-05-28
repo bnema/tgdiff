@@ -25,6 +25,7 @@ func NewRootCommand(cfg *viper.Viper, run RunFunc) (*cobra.Command, error) {
 	runWithReviewConfig := func(mode core.DiffMode, options reviewConfig) func(*cobra.Command, []string) error {
 		return func(cmd *cobra.Command, args []string) error {
 			setReviewConfig(cfg, mode, options)
+			cfg.Set("startup-detect", true)
 			return runCommand(cmd, args)
 		}
 	}
@@ -42,6 +43,7 @@ func NewRootCommand(cfg *viper.Viper, run RunFunc) (*cobra.Command, error) {
 	cfg.SetDefault("repo-path", ".")
 	cfg.SetDefault("context-lines", 3)
 	cfg.SetDefault("diff-mode", string(core.DiffModeBranch))
+	cfg.SetDefault("startup-detect", true)
 	if err := cfg.BindPFlag("repo-path", flags.Lookup("repo-path")); err != nil {
 		return nil, fmt.Errorf("bind repo-path flag: %w", err)
 	}
@@ -65,6 +67,7 @@ func diffModeCommands(cfg *viper.Viper, runCommand func(*cobra.Command, []string
 	runWithReviewConfig := func(mode core.DiffMode, options func([]string) reviewConfig) func(*cobra.Command, []string) error {
 		return func(cmd *cobra.Command, args []string) error {
 			setReviewConfig(cfg, mode, options(args))
+			cfg.Set("startup-detect", false)
 			return runCommand(cmd, args)
 		}
 	}
@@ -136,6 +139,7 @@ func runWithRequiredReviewConfig(cfg *viper.Viper, runCommand func(*cobra.Comman
 			return cmd.Help()
 		}
 		setReviewConfig(cfg, mode, options(args))
+		cfg.Set("startup-detect", false)
 		return runCommand(cmd, args)
 	}
 }

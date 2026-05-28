@@ -71,6 +71,7 @@ It composes:
 - go-git-backed repository adapter
 - syntax adapter
 - core business/application services
+- startup mode detection and mixed-change prompting
 - CLI adapter
 - TUI adapter factories
 
@@ -101,6 +102,7 @@ The core decides which lines are visible and where expansion affordances appear.
 Initial core services:
 
 - `ResolveBaseBranch`
+- `ResolveStartupDecision`
 - `LoadBranchReview`
 - `BuildReviewFiles`
 - `ExpandReviewSection`
@@ -116,6 +118,7 @@ Initial outbound ports:
 
 - `GitDiffLoader`
 - `BaseBranchResolver`
+- startup state reader for smart default launch
 - `FileContentReader`
 - `SyntaxTokenizer`
 - `ReviewCallbackPublisher` (reserved for later integration)

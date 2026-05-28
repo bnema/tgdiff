@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -94,6 +95,70 @@ func TestRunDefaultsBackToBranchModeAndFlagDefaultsAfterModeCommand(t *testing.T
 	assert.Empty(t, loader.requests[1].Revision)
 }
 
+func TestRunDetectsStartupModeWhenNoExplicitCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		state      core.StartupState
+		promptMode core.DiffMode
+		wantMode   core.DiffMode
+		wantErr    string
+	}{
+		{name: "working changes", state: core.StartupState{HasUnstagedChanges: true}, wantMode: core.DiffModeWorking},
+		{name: "staged changes", state: core.StartupState{HasStagedChanges: true}, wantMode: core.DiffModeStaged},
+		{name: "ahead of upstream", state: core.StartupState{HasUpstream: true, Ahead: 1}, wantMode: core.DiffModeUpstream},
+		{name: "mixed prompts and uses selected mode", state: core.StartupState{HasStagedChanges: true, HasUnstagedChanges: true}, promptMode: core.DiffModeLocal, wantMode: core.DiffModeLocal},
+		{name: "mixed non-interactive errors", state: core.StartupState{HasStagedChanges: true, HasUnstagedChanges: true}, wantErr: "choose explicitly"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := viper.New()
+			loader := &fakeReviewLoader{files: minimalReviewFiles()}
+			runner := &fakeRunner{}
+			stateReader := &fakeStartupStateReader{state: tt.state}
+			prompt := &fakeStartupPrompt{mode: tt.promptMode}
+			interactive := tt.wantErr == ""
+			application, err := newAppWithStartup(cfg, loader, runner, stateReader, prompt, func() bool { return interactive })
+			require.NoError(t, err)
+
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			err = application.Run(nil, &stdout, &stderr)
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+				assert.Empty(t, loader.requests)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, loader.requests, 1)
+			assert.Equal(t, tt.wantMode, loader.requests[0].DiffMode)
+		})
+	}
+}
+
+func TestRunExplicitCommandBypassesStartupDetection(t *testing.T) {
+	t.Parallel()
+
+	cfg := viper.New()
+	loader := &fakeReviewLoader{files: minimalReviewFiles()}
+	runner := &fakeRunner{}
+	stateReader := &fakeStartupStateReader{err: fmt.Errorf("should not read startup state")}
+	application, err := newAppWithStartup(cfg, loader, runner, stateReader, &fakeStartupPrompt{}, func() bool { return true })
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err = application.Run([]string{"staged"}, &stdout, &stderr)
+	require.NoError(t, err)
+	require.Len(t, loader.requests, 1)
+	assert.Equal(t, core.DiffModeStaged, loader.requests[0].DiffMode)
+}
+
 func TestRunLoadsReviewAndRunsTUIWithConfig(t *testing.T) {
 	t.Parallel()
 
@@ -163,6 +228,30 @@ func minimalReviewFiles() []core.ReviewFile {
 			Lines: []core.ReviewLine{{NewLineNumber: 1, Content: "package main", Kind: core.LineKindAdded}},
 		}},
 	}}
+}
+
+type fakeStartupStateReader struct {
+	state core.StartupState
+	err   error
+}
+
+func (f *fakeStartupStateReader) ReadStartupState(string) (core.StartupState, error) {
+	return f.state, f.err
+}
+
+type fakeStartupPrompt struct {
+	mode core.DiffMode
+	err  error
+}
+
+func (f *fakeStartupPrompt) PromptLocalChangeMode() (core.DiffMode, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	if f.mode == "" {
+		return core.DiffModeStaged, nil
+	}
+	return f.mode, nil
 }
 
 type fakeReviewLoader struct {

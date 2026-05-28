@@ -21,6 +21,14 @@ type reviewLoader interface {
 	LoadReview(request core.ReviewRequest) ([]core.ReviewFile, error)
 }
 
+type startupStateReader interface {
+	ReadStartupState(repoPath string) (core.StartupState, error)
+}
+
+type startupPrompt interface {
+	PromptLocalChangeMode() (core.DiffMode, error)
+}
+
 type tuiRunner interface {
 	Run(model tea.Model) error
 }
@@ -36,10 +44,14 @@ func New() (*App, error) {
 	syntaxTokenizer := chromatokenizer.NewTokenizer()
 	reviewLoader := core.NewReviewLoader(repositoryLoader, repositoryLoader, syntaxTokenizer, repositoryLoader)
 	runner := tui.NewRunner()
-	return newApp(cfg, reviewLoader, runner)
+	return newAppWithStartup(cfg, reviewLoader, runner, repositoryLoader, tui.NewStartupPrompt(terminal.NewCapabilities()), terminal.IsInteractive)
 }
 
 func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, error) {
+	return newAppWithStartup(cfg, loader, runner, nil, nil, func() bool { return false })
+}
+
+func newAppWithStartup(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, startupReader startupStateReader, prompt startupPrompt, isInteractive func() bool) (*App, error) {
 	if cfg == nil {
 		cfg = viper.New()
 	}
@@ -59,6 +71,13 @@ func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, erro
 			BaseRevision: cfg.GetString("base-revision"),
 			HeadRevision: cfg.GetString("head-revision"),
 			UpstreamRef:  cfg.GetString("upstream-ref"),
+		}
+		if cfg.GetBool("startup-detect") {
+			request, err := resolveStartupRequest(initialRequest, startupReader, prompt, isInteractive)
+			if err != nil {
+				return err
+			}
+			initialRequest = request
 		}
 		files, err := loader.LoadReview(initialRequest)
 		if err != nil {

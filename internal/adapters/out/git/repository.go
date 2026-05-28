@@ -7,10 +7,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	ggit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+
+	"tgdiff/internal/core"
 )
 
 type RepositoryLoader struct{}
@@ -65,8 +68,29 @@ func (l *RepositoryLoader) ResolveBaseBranch(path string) (string, error) {
 	return "", fmt.Errorf("resolve base branch: no origin/HEAD, origin/main, origin/master, main, or master reference found")
 }
 
+func (l *RepositoryLoader) ReadStartupState(path string) (core.StartupState, error) {
+	output, err := runGit(path, "status", "--porcelain=v1", "--branch", "--untracked-files=normal")
+	if err != nil {
+		return core.StartupState{}, err
+	}
+
+	state := parseStartupStatus(output)
+	if _, err := l.ResolveBaseBranch(path); err == nil {
+		state.HasDefaultBranch = true
+	}
+	return state, nil
+}
+
 func (l *RepositoryLoader) LoadWorkingTreeDiff(path string) (string, error) {
-	return runGitDiff(path)
+	diff, err := runGitDiff(path)
+	if err != nil {
+		return "", err
+	}
+	untrackedDiff, err := l.loadUntrackedFilesDiff(path)
+	if err != nil {
+		return "", err
+	}
+	return diff + untrackedDiff, nil
 }
 
 func (l *RepositoryLoader) LoadStagedDiff(path string) (string, error) {
@@ -74,7 +98,15 @@ func (l *RepositoryLoader) LoadStagedDiff(path string) (string, error) {
 }
 
 func (l *RepositoryLoader) LoadLocalDiff(path string) (string, error) {
-	return runGitDiff(path, "HEAD")
+	diff, err := runGitDiff(path, "HEAD")
+	if err != nil {
+		return "", err
+	}
+	untrackedDiff, err := l.loadUntrackedFilesDiff(path)
+	if err != nil {
+		return "", err
+	}
+	return diff + untrackedDiff, nil
 }
 
 func (l *RepositoryLoader) LoadUpstreamDiff(path, upstreamRef string) (string, error) {
@@ -169,6 +201,67 @@ func (l *RepositoryLoader) LoadBranchDiff(path, baseBranch string) (string, erro
 	return patch.String() + untrackedDiff, nil
 }
 
+func parseStartupStatus(output string) core.StartupState {
+	var state core.StartupState
+	for line := range strings.SplitSeq(strings.TrimSuffix(output, "\n"), "\n") {
+		if strings.HasPrefix(line, "## ") {
+			parseStartupBranchLine(line, &state)
+			continue
+		}
+		if len(line) < 2 {
+			continue
+		}
+		indexStatus := line[0]
+		worktreeStatus := line[1]
+		switch {
+		case indexStatus == '?' && worktreeStatus == '?':
+			state.HasUntrackedFiles = true
+		default:
+			if indexStatus != ' ' && indexStatus != '?' {
+				state.HasStagedChanges = true
+			}
+			if worktreeStatus != ' ' && worktreeStatus != '?' {
+				state.HasUnstagedChanges = true
+			}
+		}
+	}
+	return state
+}
+
+func parseStartupBranchLine(line string, state *core.StartupState) {
+	branch := strings.TrimPrefix(line, "## ")
+	if strings.HasPrefix(branch, "HEAD ") || branch == "HEAD" {
+		state.DetachedHead = true
+		return
+	}
+	if !strings.Contains(branch, "...") {
+		return
+	}
+	state.HasUpstream = true
+	metadataStart := strings.Index(branch, "[")
+	metadataEnd := strings.LastIndex(branch, "]")
+	if metadataStart < 0 || metadataEnd <= metadataStart {
+		return
+	}
+	for part := range strings.SplitSeq(branch[metadataStart+1:metadataEnd], ",") {
+		part = strings.TrimSpace(part)
+		if value, ok := strings.CutPrefix(part, "ahead "); ok {
+			state.Ahead = parsePositiveInt(value)
+		}
+		if value, ok := strings.CutPrefix(part, "behind "); ok {
+			state.Behind = parsePositiveInt(value)
+		}
+	}
+}
+
+func parsePositiveInt(value string) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0
+	}
+	return parsed
+}
+
 func branchName(name plumbing.ReferenceName) (string, bool) {
 	for _, prefix := range []string{"refs/remotes/origin/", "refs/heads/"} {
 		if branch, ok := strings.CutPrefix(name.String(), prefix); ok {
@@ -199,6 +292,14 @@ func resolveBranchReference(repo *ggit.Repository, branch string) (*plumbing.Ref
 
 func remoteBranchReferenceName(branch string) plumbing.ReferenceName {
 	return plumbing.ReferenceName("refs/remotes/origin/" + branch)
+}
+
+func (l *RepositoryLoader) loadUntrackedFilesDiff(repoPath string) (string, error) {
+	repo, err := l.Open(repoPath)
+	if err != nil {
+		return "", fmt.Errorf("open repository: %w", err)
+	}
+	return l.untrackedFilesDiff(repo, repoPath)
 }
 
 func (l *RepositoryLoader) untrackedFilesDiff(repo *ggit.Repository, repoPath string) (string, error) {
