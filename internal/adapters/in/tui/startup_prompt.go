@@ -61,7 +61,13 @@ func (m startupPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	switch key.String() {
+	keyString := key.String()
+	if selected, ok := m.shortcutIndex(keyString); ok {
+		m.selected = selected
+		return m, tea.Quit
+	}
+
+	switch keyString {
 	case "q", "esc", "ctrl+c":
 		m.cancelled = true
 		return m, tea.Quit
@@ -69,17 +75,19 @@ func (m startupPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selected = max(m.selected-1, 0)
 	case "down", "j":
 		m.selected = min(m.selected+1, len(m.options)-1)
-	case "s", "u", "a":
-		for i, option := range m.options {
-			if option.key == key.String() {
-				m.selected = i
-				return m, tea.Quit
-			}
-		}
 	case "enter":
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+func (m startupPromptModel) shortcutIndex(key string) (int, bool) {
+	for i, option := range m.options {
+		if option.key == key {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 func (m startupPromptModel) View() tea.View {
