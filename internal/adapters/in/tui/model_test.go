@@ -64,7 +64,7 @@ func TestModelViewRendersSequentialReviewDocumentWithoutFileExplorer(t *testing.
 	}
 }
 
-func TestModelScrollsSequentialReviewDocumentWithJKAndArrows(t *testing.T) {
+func TestModelMovesCursorThroughSequentialReviewDocumentWithJKAndArrows(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -85,19 +85,19 @@ func TestModelScrollsSequentialReviewDocumentWithJKAndArrows(t *testing.T) {
 			updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
 			model = updated.(Model)
 
-			initial := model.reviewViewport.YOffset()
+			initial := model.cursorRow
 			updated, _ = model.Update(tt.keys[0])
 			model = updated.(Model)
-			assert.Greater(t, model.reviewViewport.YOffset(), initial)
+			assert.Greater(t, model.cursorRow, initial)
 
-			afterDown := model.reviewViewport.YOffset()
+			afterDown := model.cursorRow
 			updated, _ = model.Update(tt.keys[1])
 			model = updated.(Model)
-			assert.Less(t, model.reviewViewport.YOffset(), afterDown)
+			assert.Less(t, model.cursorRow, afterDown)
 
 			updated, _ = model.Update(tt.keys[2])
 			model = updated.(Model)
-			assert.Greater(t, model.reviewViewport.YOffset(), initial)
+			assert.Greater(t, model.cursorRow, initial)
 		})
 	}
 }

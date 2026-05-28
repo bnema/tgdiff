@@ -10,7 +10,7 @@ import (
 	"tgdiff/internal/core"
 )
 
-func TestSearchAcceptFileResultScrollsToFileHeader(t *testing.T) {
+func TestSearchAcceptFileResultMovesCursorToFileHeader(t *testing.T) {
 	t.Parallel()
 
 	model := NewModel([]core.ReviewFile{
@@ -28,7 +28,9 @@ func TestSearchAcceptFileResultScrollsToFileHeader(t *testing.T) {
 
 	require.False(t, model.search.active())
 	assert.Equal(t, 1, model.selectedFile)
-	assert.Equal(t, model.reviewAnchors.FileRows[1], model.reviewViewport.YOffset())
+	assert.Equal(t, model.reviewAnchors.FileRows[1], model.cursorRow)
+	assert.LessOrEqual(t, model.reviewViewport.YOffset(), model.cursorRow)
+	assert.Less(t, model.cursorRow, model.reviewViewport.YOffset()+model.reviewViewport.Height())
 }
 
 func TestSearchAcceptFileResultClampsOffsetForShortDocuments(t *testing.T) {
@@ -51,7 +53,7 @@ func TestSearchAcceptFileResultClampsOffsetForShortDocuments(t *testing.T) {
 	assert.Contains(t, stripANSI(model.View().Content), "zeta.go")
 }
 
-func TestSearchAcceptGrepResultScrollsToChangedLine(t *testing.T) {
+func TestSearchAcceptGrepResultMovesCursorToChangedLine(t *testing.T) {
 	t.Parallel()
 
 	model := NewModel([]core.ReviewFile{{
@@ -74,7 +76,9 @@ func TestSearchAcceptGrepResultScrollsToChangedLine(t *testing.T) {
 	model = updated.(Model)
 
 	anchor := ReviewLineAnchor{FileIndex: 0, SectionIndex: 0, LineIndex: 1}
-	assert.Equal(t, model.reviewAnchors.LineRows[anchor], model.reviewViewport.YOffset())
+	assert.Equal(t, model.reviewAnchors.LineRows[anchor], model.cursorRow)
+	assert.LessOrEqual(t, model.reviewViewport.YOffset(), model.cursorRow)
+	assert.Less(t, model.cursorRow, model.reviewViewport.YOffset()+model.reviewViewport.Height())
 }
 
 func TestSearchAcceptGrepResultPreservesAlreadyVisibleContextExpansion(t *testing.T) {
@@ -116,7 +120,7 @@ func TestSearchAcceptGrepResultWithMissingAnchorLeavesOffsetUnchanged(t *testing
 	assert.Equal(t, 3, model.reviewViewport.YOffset())
 }
 
-func TestSearchAcceptGrepResultExpandsHiddenContextBeforeScrolling(t *testing.T) {
+func TestSearchAcceptGrepResultExpandsHiddenContextBeforeMovingCursor(t *testing.T) {
 	t.Parallel()
 
 	model := NewModel([]core.ReviewFile{{
@@ -144,5 +148,7 @@ func TestSearchAcceptGrepResultExpandsHiddenContextBeforeScrolling(t *testing.T)
 	row, anchoredAfter := model.reviewAnchors.LineRows[anchor]
 	require.True(t, anchoredAfter)
 	assert.Equal(t, 0, model.files[0].Sections[0].HiddenLineCount())
-	assert.Equal(t, row, model.reviewViewport.YOffset())
+	assert.Equal(t, row, model.cursorRow)
+	assert.LessOrEqual(t, model.reviewViewport.YOffset(), model.cursorRow)
+	assert.Less(t, model.cursorRow, model.reviewViewport.YOffset()+model.reviewViewport.Height())
 }

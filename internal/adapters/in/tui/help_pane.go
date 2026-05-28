@@ -30,6 +30,8 @@ func renderHelpPane(width, height int) string {
 		renderHelpShortcut("h/l", "previous/next file", contentWidth),
 		renderHelpShortcut("a/b", "expand context", contentWidth),
 		renderHelpShortcut("enter", "expand selected context", contentWidth),
+		renderHelpShortcut("s/space", "select lines", contentWidth),
+		renderHelpShortcut("y/Y", "copy plain/rich", contentWidth),
 		renderHelpShortcut("q", "quit", contentWidth),
 		"",
 		helpSectionStyle.Render("Search"),

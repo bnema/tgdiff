@@ -1,7 +1,11 @@
 package tui
 
 import (
+	"context"
+	"fmt"
 	"sort"
+	"strings"
+	"time"
 
 	viewport "charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -31,24 +35,45 @@ type reviewLoadFailedMsg struct {
 	err          error
 }
 
+type copyFeedbackExpiredMsg struct {
+	id int
+}
+
+type clipboardCopiedMsg struct {
+	text         string
+	lineCount    int
+	withMetadata bool
+}
+
+type clipboardCopyFailedMsg struct {
+	err error
+}
+
 type Model struct {
-	title           string
-	files           []core.ReviewFile
-	loader          reviewLoader
-	request         core.ReviewRequest
-	loading         bool
-	loadError       string
-	selectedFile    int
-	selectedContext int
-	width           int
-	height          int
-	reviewViewport  viewport.Model
-	reviewAnchors   ReviewAnchors
-	activeFilePath  string
-	diffMode        core.DiffMode
-	nerdFont        bool
-	helpActive      bool
-	search          searchState
+	title              string
+	files              []core.ReviewFile
+	loader             reviewLoader
+	request            core.ReviewRequest
+	loading            bool
+	loadError          string
+	selectedFile       int
+	selectedContext    int
+	width              int
+	height             int
+	reviewViewport     viewport.Model
+	reviewAnchors      ReviewAnchors
+	activeFilePath     string
+	cursorRow          int
+	selectionAnchorRow *int
+	reviewRows         []ReviewRow
+	clipboardWriter    ports.ClipboardWriter
+	lastCopiedText     string
+	copyFeedback       string
+	copyFeedbackID     int
+	diffMode           core.DiffMode
+	nerdFont           bool
+	helpActive         bool
+	search             searchState
 }
 
 func NewModel(files []core.ReviewFile) Model {
@@ -60,6 +85,10 @@ func NewModelWithTerminal(files []core.ReviewFile, terminal ports.Terminal) Mode
 }
 
 func NewModelWithLoader(files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest) Model {
+	return NewModelWithClipboardWriter(files, terminal, loader, request, nil)
+}
+
+func NewModelWithClipboardWriter(files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest, clipboardWriter ports.ClipboardWriter) Model {
 	if request.DiffMode == "" {
 		request.DiffMode = core.DiffModeBranch
 	}
@@ -72,6 +101,7 @@ func NewModelWithLoader(files []core.ReviewFile, terminal ports.Terminal, loader
 		width:           defaultWidth,
 		height:          defaultHeight,
 		reviewViewport:  viewport.New(),
+		clipboardWriter: clipboardWriter,
 		diffMode:        request.DiffMode,
 		nerdFont:        true,
 		search:          newSearchState(),
@@ -98,6 +128,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.request.DiffMode = msg.mode
 		m.files = sortedReviewFiles(msg.files)
 		m.selectedFile = 0
+		m.cursorRow = 0
+		m.clearSelection()
 		m.resetContextSelection()
 		m.reviewViewport.GotoTop()
 		m.syncReviewViewport()
@@ -108,6 +140,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.diffMode = msg.previousMode
 		m.request.DiffMode = msg.previousMode
 		return m, nil
+	case copyFeedbackExpiredMsg:
+		if msg.id == m.copyFeedbackID {
+			m.copyFeedback = ""
+		}
+		return m, nil
+	case clipboardCopiedMsg:
+		m.lastCopiedText = msg.text
+		feedback := fmt.Sprintf("Copied %d %s", msg.lineCount, pluralize("line", msg.lineCount))
+		if msg.withMetadata {
+			feedback += " with metadata"
+		}
+		m.setCopyFeedback(feedback)
+		return m, m.expireCopyFeedbackCmd()
+	case clipboardCopyFailedMsg:
+		m.setCopyFeedback("Copy failed: " + msg.err.Error())
+		return m, m.expireCopyFeedbackCmd()
 	case tea.WindowSizeMsg:
 		m.width = max(msg.Width, 0)
 		m.height = max(msg.Height, 0)
@@ -136,23 +184,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up", "k":
-			m.reviewViewport.ScrollUp(1)
-			m.updateActiveFileFromViewport()
+			m.moveCursor(-1)
 		case "down", "j":
-			m.reviewViewport.ScrollDown(1)
-			m.updateActiveFileFromViewport()
+			m.moveCursor(1)
 		case "pgup":
-			m.reviewViewport.PageUp()
-			m.updateActiveFileFromViewport()
+			m.moveCursor(-m.reviewViewport.Height())
 		case "pgdown":
-			m.reviewViewport.PageDown()
-			m.updateActiveFileFromViewport()
+			m.moveCursor(m.reviewViewport.Height())
 		case "home":
-			m.reviewViewport.GotoTop()
-			m.updateActiveFileFromViewport()
+			m.moveCursorToStart()
 		case "end":
-			m.reviewViewport.GotoBottom()
-			m.updateActiveFileFromViewport()
+			m.moveCursorToEnd()
+		case "s", "space":
+			m.toggleSelection()
+		case "esc":
+			m.clearSelection()
+		case "y":
+			return m.copyToClipboard(false)
+		case "Y":
+			return m.copyToClipboard(true)
 		case "f":
 			return m.openSearch(searchModeFiles)
 		case "/":
@@ -172,7 +222,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		default:
 			var cmd tea.Cmd
 			m.reviewViewport, cmd = m.reviewViewport.Update(msg)
-			m.updateActiveFileFromViewport()
+			m.cursorRow = m.clampCursorRow(m.reviewViewport.YOffset())
+			m.updateActiveFileFromCursor()
 			return m, cmd
 		}
 		return m, nil
@@ -182,7 +233,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() tea.View {
-	review := m.reviewViewport.View()
+	reviewViewport := m.reviewViewport
+	reviewViewport.LeftGutterFunc = m.reviewGutter
+	reviewViewport.StyleLineFunc = m.reviewLineStyle
+	review := reviewViewport.View()
 	if m.loading {
 		review = mutedStyle.Render("Loading diff…") + "\n" + review
 	} else if m.loadError != "" {
@@ -194,7 +248,8 @@ func (m Model) View() tea.View {
 			AppName:       m.title,
 			Mode:          diffModeLabel(m.diffMode, m.nerdFont),
 			FileCount:     len(m.files),
-			CurrentFile:   m.activeFilePath,
+			CurrentFile:   m.activeLocation(),
+			Message:       m.copyFeedback,
 			ScrollPercent: m.reviewViewport.ScrollPercent(),
 		}),
 	)
@@ -215,6 +270,7 @@ func (m *Model) moveFile(delta int) {
 	}
 
 	m.selectedFile = min(max(m.selectedFile+delta, 0), len(m.files)-1)
+	m.clearSelection()
 	m.resetContextSelection()
 	m.syncReviewViewport()
 }
@@ -239,6 +295,7 @@ func (m *Model) expandSelectedContextAbove(count int) {
 		return
 	}
 	section.ExpandAbove(count)
+	m.clearSelection()
 	m.normalizeContextSelection()
 	m.syncReviewViewport()
 }
@@ -249,6 +306,7 @@ func (m *Model) expandSelectedContextBelow(count int) {
 		return
 	}
 	section.ExpandBelow(count)
+	m.clearSelection()
 	m.normalizeContextSelection()
 	m.syncReviewViewport()
 }
@@ -259,6 +317,7 @@ func (m *Model) expandSelectedContextAll() {
 		return
 	}
 	section.ExpandAll()
+	m.clearSelection()
 	m.normalizeContextSelection()
 	m.syncReviewViewport()
 }
@@ -325,31 +384,297 @@ func (m *Model) syncReviewViewport() {
 	width := m.reviewWidth()
 	height := max(m.height-1, 1)
 	rendered := NewReviewDocument(width).RenderWithAnchors(m.files, m.selectedFile, m.selectedContext)
-	currentOffset := m.reviewViewport.YOffset()
+	currentCursor := m.cursorRow
 	m.reviewViewport.SetWidth(width)
 	m.reviewViewport.SetHeight(height)
-	m.reviewViewport.SetContent(rendered.Content)
+	m.reviewViewport.SetContentLines(rendered.Lines)
 	m.reviewAnchors = rendered.Anchors
-	m.reviewViewport.SetYOffset(currentOffset)
-	m.updateActiveFileFromViewport()
+	m.reviewRows = rendered.Rows
+	m.cursorRow = m.clampCursorRow(currentCursor)
+	m.centerViewportOnCursor()
+	m.updateActiveFileFromCursor()
 }
 
-func (m *Model) updateActiveFileFromViewport() {
-	if len(m.files) == 0 || len(m.reviewAnchors.FileRows) == 0 {
+func (m *Model) moveCursor(delta int) {
+	m.cursorRow = m.selectableRowFrom(m.cursorRow, delta)
+	m.centerViewportOnCursor()
+	m.updateActiveFileFromCursor()
+}
+
+func (m *Model) moveCursorToStart() {
+	m.cursorRow = m.firstSelectableRow()
+	m.centerViewportOnCursor()
+	m.updateActiveFileFromCursor()
+}
+
+func (m *Model) moveCursorToEnd() {
+	m.cursorRow = m.lastSelectableRow()
+	m.centerViewportOnCursor()
+	m.updateActiveFileFromCursor()
+}
+
+func (m Model) clampCursorRow(row int) int {
+	first := m.firstSelectableRow()
+	last := m.lastSelectableRow()
+	if last < first {
+		return 0
+	}
+	return min(max(row, first), last)
+}
+
+func (m Model) selectableRowFrom(row, delta int) int {
+	if delta == 0 {
+		return m.clampCursorRow(row)
+	}
+	step := 1
+	if delta < 0 {
+		step = -1
+	}
+	remaining := delta
+	current := row
+	for remaining != 0 {
+		next := current + step
+		if next < m.firstSelectableRow() || next > m.lastSelectableRow() {
+			return m.clampCursorRow(next)
+		}
+		current = next
+		if current >= 0 && current < len(m.reviewRows) && m.reviewRows[current].Selectable {
+			remaining -= step
+		}
+	}
+	return m.clampCursorRow(current)
+}
+
+func (m Model) firstSelectableRow() int {
+	for i, row := range m.reviewRows {
+		if row.Selectable {
+			return i
+		}
+	}
+	return 0
+}
+
+func (m Model) lastSelectableRow() int {
+	for i := len(m.reviewRows) - 1; i >= 0; i-- {
+		if m.reviewRows[i].Selectable {
+			return i
+		}
+	}
+	return 0
+}
+
+func (m *Model) centerViewportOnCursor() {
+	m.reviewViewport.SetYOffset(m.cursorRow - m.reviewViewport.Height()/2)
+}
+
+func (m *Model) updateActiveFileFromCursor() {
+	if len(m.files) == 0 || len(m.reviewRows) == 0 {
 		m.activeFilePath = ""
 		return
 	}
 
-	activeIndex := 0
-	activeRow := -1
-	offset := m.reviewViewport.YOffset()
-	for fileIndex, row := range m.reviewAnchors.FileRows {
-		if row <= offset && row >= activeRow {
-			activeIndex = fileIndex
-			activeRow = row
+	rowIndex := min(max(m.cursorRow, 0), len(m.reviewRows)-1)
+	fileIndex := m.reviewRows[rowIndex].FileIndex
+	if fileIndex < 0 || fileIndex >= len(m.files) {
+		m.activeFilePath = ""
+		return
+	}
+	m.activeFilePath = m.files[fileIndex].Path
+}
+
+func (m Model) reviewGutter(info viewport.GutterContext) string {
+	if info.Soft || info.Index >= len(m.reviewRows) {
+		return "  "
+	}
+	start, end, selected := m.selectedRange()
+	if info.Index == m.cursorRow {
+		return statusKeyStyle.Render("➜ ")
+	}
+	if selected && info.Index >= start && info.Index <= end {
+		return selectedExpander.Render("┃ ")
+	}
+	return "  "
+}
+
+func (m Model) reviewLineStyle(rowIndex int) lipgloss.Style {
+	start, end, selected := m.selectedRange()
+	if selected && rowIndex >= start && rowIndex <= end {
+		return selectedRowStyle
+	}
+	if rowIndex == m.cursorRow {
+		return cursorRowStyle
+	}
+	return lipgloss.NewStyle()
+}
+
+func (m *Model) toggleSelection() {
+	if m.selectionAnchorRow != nil {
+		m.clearSelection()
+		return
+	}
+	anchor := m.cursorRow
+	m.selectionAnchorRow = &anchor
+}
+
+func (m *Model) clearSelection() {
+	m.selectionAnchorRow = nil
+}
+
+func (m Model) copyToClipboard(withMetadata bool) (Model, tea.Cmd) {
+	rows := m.selectedRows()
+	if len(rows) == 0 {
+		m.setCopyFeedback("No diff lines to copy")
+		return m, nil
+	}
+	if m.clipboardWriter == nil {
+		m.setCopyFeedback("Copy failed: clipboard unavailable")
+		return m, m.expireCopyFeedbackCmd()
+	}
+
+	text := m.copyPlainText()
+	if withMetadata {
+		text = m.copyMetadataText()
+	}
+	lineCount := len(rows)
+	writer := m.clipboardWriter
+	return m, func() tea.Msg {
+		if err := writer.WriteClipboard(context.Background(), text); err != nil {
+			return clipboardCopyFailedMsg{err: err}
+		}
+		return clipboardCopiedMsg{text: text, lineCount: lineCount, withMetadata: withMetadata}
+	}
+}
+
+func (m *Model) setCopyFeedback(message string) {
+	m.copyFeedbackID++
+	m.copyFeedback = message
+}
+
+func (m Model) expireCopyFeedbackCmd() tea.Cmd {
+	id := m.copyFeedbackID
+	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+		return copyFeedbackExpiredMsg{id: id}
+	})
+}
+
+func (m Model) selectedRange() (int, int, bool) {
+	if m.selectionAnchorRow == nil {
+		return m.cursorRow, m.cursorRow, false
+	}
+	start := min(*m.selectionAnchorRow, m.cursorRow)
+	end := max(*m.selectionAnchorRow, m.cursorRow)
+	return start, end, true
+}
+
+func (m Model) selectedRows() []ReviewRow {
+	start, end, ok := m.selectedRange()
+	if !ok {
+		start, end = m.cursorRow, m.cursorRow
+	}
+	if len(m.reviewRows) == 0 {
+		return nil
+	}
+	start = min(max(start, 0), len(m.reviewRows)-1)
+	end = min(max(end, 0), len(m.reviewRows)-1)
+	rows := make([]ReviewRow, 0, end-start+1)
+	for _, row := range m.reviewRows[start : end+1] {
+		if row.Kind == ReviewRowKindLine {
+			rows = append(rows, row)
 		}
 	}
-	m.activeFilePath = m.files[activeIndex].Path
+	return rows
+}
+
+func (m Model) copyPlainText() string {
+	rows := m.selectedRows()
+	lines := make([]string, 0, len(rows))
+	for _, row := range rows {
+		lines = append(lines, plainDiffLine(row.Line))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) copyMetadataText() string {
+	rows := m.selectedRows()
+	if len(rows) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for i := 0; i < len(rows); {
+		filePath := rows[i].FilePath
+		j := i + 1
+		for j < len(rows) && rows[j].FilePath == filePath {
+			j++
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString("File: ")
+		b.WriteString(filePath)
+		b.WriteString("\n")
+		b.WriteString("Lines: ")
+		b.WriteString(lineRef(rows[i].Line))
+		if j-i > 1 {
+			b.WriteString(" to ")
+			b.WriteString(lineRef(rows[j-1].Line))
+		}
+		b.WriteString("\n\n```diff\n")
+		for _, row := range rows[i:j] {
+			b.WriteString(plainDiffLine(row.Line))
+			b.WriteString("\n")
+		}
+		b.WriteString("```")
+		i = j
+	}
+	return b.String()
+}
+
+func plainDiffLine(line core.ReviewLine) string {
+	prefix := " "
+	switch line.Kind {
+	case core.LineKindAdded:
+		prefix = "+"
+	case core.LineKindDeleted:
+		prefix = "-"
+	}
+	return prefix + " " + line.Content
+}
+
+func pluralize(word string, count int) string {
+	if count == 1 {
+		return word
+	}
+	return word + "s"
+}
+
+func lineRef(line core.ReviewLine) string {
+	parts := make([]string, 0, 2)
+	if line.OldLineNumber > 0 {
+		parts = append(parts, fmt.Sprintf("-%d", line.OldLineNumber))
+	}
+	if line.NewLineNumber > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", line.NewLineNumber))
+	}
+	return strings.Join(parts, "/")
+}
+
+func (m Model) activeLocation() string {
+	if m.activeFilePath == "" {
+		return ""
+	}
+	if m.cursorRow < 0 || m.cursorRow >= len(m.reviewRows) {
+		return m.activeFilePath
+	}
+	row := m.reviewRows[m.cursorRow]
+	if row.Kind != ReviewRowKindLine {
+		return m.activeFilePath
+	}
+	lineNumber := displayLineNumber(row.Line)
+	if lineNumber <= 0 {
+		return m.activeFilePath
+	}
+	return fmt.Sprintf("%s:%d", m.activeFilePath, lineNumber)
 }
 
 func (m Model) reviewWidth() int {

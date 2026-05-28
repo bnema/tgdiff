@@ -87,10 +87,12 @@ func (m *Model) jumpToFile(fileIndex int) {
 		return
 	}
 	m.selectedFile = fileIndex
+	m.clearSelection()
 	m.resetContextSelection()
 	m.syncReviewViewport()
-	m.reviewViewport.SetYOffset(m.reviewAnchors.FileRows[fileIndex])
-	m.updateActiveFileFromViewport()
+	m.cursorRow = m.clampCursorRow(m.reviewAnchors.FileRows[fileIndex])
+	m.centerViewportOnCursor()
+	m.updateActiveFileFromCursor()
 }
 
 func (m *Model) jumpToLine(result SearchResult) {
@@ -101,17 +103,23 @@ func (m *Model) jumpToLine(result SearchResult) {
 		return
 	}
 	section := &m.files[result.FileIndex].Sections[result.SectionIndex]
+	if result.LineIndex < 0 || result.LineIndex >= len(section.Lines) {
+		return
+	}
 	if section.Kind == core.SectionKindContext && !contextLineVisible(*section, result.LineIndex) {
 		section.ExpandAll()
+		m.clearSelection()
 	}
 	m.selectedFile = result.FileIndex
+	m.clearSelection()
 	m.resetContextSelection()
 	m.syncReviewViewport()
 	anchor := ReviewLineAnchor{FileIndex: result.FileIndex, SectionIndex: result.SectionIndex, LineIndex: result.LineIndex}
 	if row, ok := m.reviewAnchors.LineRows[anchor]; ok {
-		m.reviewViewport.SetYOffset(row)
+		m.cursorRow = m.clampCursorRow(row)
+		m.centerViewportOnCursor()
 	}
-	m.updateActiveFileFromViewport()
+	m.updateActiveFileFromCursor()
 }
 
 func contextLineVisible(section core.ReviewSection, lineIndex int) bool {

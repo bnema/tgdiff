@@ -12,9 +12,11 @@ import (
 	"tgdiff/internal/adapters/in/cli"
 	"tgdiff/internal/adapters/in/terminal"
 	"tgdiff/internal/adapters/in/tui"
+	clipboardadapter "tgdiff/internal/adapters/out/clipboard"
 	gitadapter "tgdiff/internal/adapters/out/git"
 	chromatokenizer "tgdiff/internal/adapters/out/syntax/chroma"
 	"tgdiff/internal/core"
+	"tgdiff/internal/ports"
 )
 
 type reviewLoader interface {
@@ -44,7 +46,8 @@ func New() (*App, error) {
 	syntaxTokenizer := chromatokenizer.NewTokenizer()
 	reviewLoader := core.NewReviewLoader(repositoryLoader, repositoryLoader, syntaxTokenizer, repositoryLoader)
 	runner := tui.NewRunner()
-	return newAppWithStartup(cfg, reviewLoader, runner, repositoryLoader, tui.NewStartupPrompt(), terminal.IsInteractive)
+	clipboardWriter := clipboardadapter.NewSystemWriter()
+	return newAppWithClipboard(cfg, reviewLoader, runner, repositoryLoader, tui.NewStartupPrompt(), terminal.IsInteractive, clipboardWriter)
 }
 
 func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, error) {
@@ -52,6 +55,10 @@ func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, erro
 }
 
 func newAppWithStartup(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, startupReader startupStateReader, prompt startupPrompt, isInteractive func() bool) (*App, error) {
+	return newAppWithClipboard(cfg, loader, runner, startupReader, prompt, isInteractive, nil)
+}
+
+func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, startupReader startupStateReader, prompt startupPrompt, isInteractive func() bool, clipboardWriter ports.ClipboardWriter) (*App, error) {
 	if cfg == nil {
 		cfg = viper.New()
 	}
@@ -83,7 +90,7 @@ func newAppWithStartup(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, 
 		if err != nil {
 			return err
 		}
-		return runner.Run(tui.NewModelWithLoader(files, terminal.NewCapabilities(), loader, initialRequest))
+		return runner.Run(tui.NewModelWithClipboardWriter(files, terminal.NewCapabilities(), loader, initialRequest, clipboardWriter))
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build root command: %w", err)
