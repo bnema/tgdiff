@@ -7,15 +7,12 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"tgdiff/internal/core"
-	"tgdiff/internal/ports"
 )
 
-type StartupPrompt struct {
-	terminal ports.Terminal
-}
+type StartupPrompt struct{}
 
-func NewStartupPrompt(terminal ports.Terminal) StartupPrompt {
-	return StartupPrompt{terminal: terminal}
+func NewStartupPrompt() StartupPrompt {
+	return StartupPrompt{}
 }
 
 func (p StartupPrompt) PromptLocalChangeMode() (core.DiffMode, error) {

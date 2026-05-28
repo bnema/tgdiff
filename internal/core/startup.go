@@ -38,6 +38,7 @@ func ResolveStartupDecision(state StartupState) StartupDecision {
 
 	switch {
 	case state.HasStagedChanges && hasWorktreeChanges:
+		// DiffModeStaged is the prompt's default selection, not a forced final choice.
 		return StartupDecision{Kind: StartupDecisionPromptLocalChanges, DiffMode: DiffModeStaged}
 	case hasWorktreeChanges:
 		return StartupDecision{Kind: StartupDecisionUseMode, DiffMode: DiffModeWorking}

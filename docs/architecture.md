@@ -118,7 +118,7 @@ Initial outbound ports:
 
 - `GitDiffLoader`
 - `BaseBranchResolver`
-- startup state reader for smart default launch
+- `StartupStateReader` for smart default launch
 - `FileContentReader`
 - `SyntaxTokenizer`
 - `ReviewCallbackPublisher` (reserved for later integration)

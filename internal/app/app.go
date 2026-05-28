@@ -44,7 +44,7 @@ func New() (*App, error) {
 	syntaxTokenizer := chromatokenizer.NewTokenizer()
 	reviewLoader := core.NewReviewLoader(repositoryLoader, repositoryLoader, syntaxTokenizer, repositoryLoader)
 	runner := tui.NewRunner()
-	return newAppWithStartup(cfg, reviewLoader, runner, repositoryLoader, tui.NewStartupPrompt(terminal.NewCapabilities()), terminal.IsInteractive)
+	return newAppWithStartup(cfg, reviewLoader, runner, repositoryLoader, tui.NewStartupPrompt(), terminal.IsInteractive)
 }
 
 func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, error) {

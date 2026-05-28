@@ -69,12 +69,17 @@ tgdiff range <base> <head>
 
 Smart startup detection chooses the first safe review scope:
 
-1. staged + unstaged/untracked changes: prompt for Staged, Unstaged, or All local changes
+1. staged + unstaged or untracked changes: prompt for Staged, Unstaged, or All local changes
 2. unstaged or untracked changes only: `working`
 3. staged changes only: `staged`
-4. local commits ahead of upstream: `upstream`
+4. local commits ahead of a configured upstream: `upstream`
 5. no upstream but a default branch exists: `branch`
-6. behind-only, detached HEAD, or no reviewable changes: exit with a clear message
+6. behind-only: exit with `branch is behind upstream; pull first or choose an explicit diff mode`
+7. detached HEAD: exit with `detached HEAD has no safe default diff; choose an explicit diff mode`
+8. no reviewable changes: exit with `no local changes or upstream/default branch diff detected`
+
+Here, unstaged means modified tracked files; untracked means new files. Both are counted as
+worktree changes for `working` and `local` reviews.
 
 When mixed local changes are detected in a non-interactive terminal, choose explicitly with
 `tgdiff staged`, `tgdiff working`, or `tgdiff local`.
