@@ -19,7 +19,7 @@ func NewStartupPrompt(terminal ports.Terminal) StartupPrompt {
 }
 
 func (p StartupPrompt) PromptLocalChangeMode() (core.DiffMode, error) {
-	model := newStartupPromptModel(p.supportsNerdFont())
+	model := newStartupPromptModel()
 	result, err := tea.NewProgram(model).Run()
 	if err != nil {
 		return "", err
@@ -34,13 +34,6 @@ func (p StartupPrompt) PromptLocalChangeMode() (core.DiffMode, error) {
 	return prompt.selectedMode(), nil
 }
 
-func (p StartupPrompt) supportsNerdFont() bool {
-	if p.terminal == nil {
-		return true
-	}
-	return p.terminal.SupportsNerdFont()
-}
-
 type startupPromptOption struct {
 	mode        core.DiffMode
 	key         string
@@ -52,12 +45,10 @@ type startupPromptModel struct {
 	options   []startupPromptOption
 	selected  int
 	cancelled bool
-	nerdFont  bool
 }
 
-func newStartupPromptModel(nerdFont bool) startupPromptModel {
+func newStartupPromptModel() startupPromptModel {
 	return startupPromptModel{
-		nerdFont: nerdFont,
 		options: []startupPromptOption{
 			{mode: core.DiffModeStaged, key: "s", label: "Staged changes", description: "What will be included in your next commit"},
 			{mode: core.DiffModeWorking, key: "u", label: "Unstaged/untracked changes", description: "Worktree changes not yet staged, including new files"},
@@ -81,15 +72,13 @@ func (m startupPromptModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selected = max(m.selected-1, 0)
 	case "down", "j":
 		m.selected = min(m.selected+1, len(m.options)-1)
-	case "s":
-		m.selected = 0
-		return m, tea.Quit
-	case "u":
-		m.selected = 1
-		return m, tea.Quit
-	case "a":
-		m.selected = 2
-		return m, tea.Quit
+	case "s", "u", "a":
+		for i, option := range m.options {
+			if option.key == key.String() {
+				m.selected = i
+				return m, tea.Quit
+			}
+		}
 	case "enter":
 		return m, tea.Quit
 	}
