@@ -1,0 +1,51 @@
+version: 2
+
+project_name: ero
+
+builds:
+  - id: ero
+    main: ./cmd/ero
+    binary: ero
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - >-
+        -s -w
+        -X ero/internal/app.version={{ .Version }}
+        -X ero/internal/app.commit={{ .Commit }}
+        -X ero/internal/app.date={{ .CommitDate }}
+        -X ero/internal/app.builtBy=goreleaser
+
+archives:
+  - id: ero
+    ids:
+      - ero
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  prerelease: auto
+  make_latest: true
+
+git:
+  tag_sort: -version:refname

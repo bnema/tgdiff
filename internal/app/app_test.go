@@ -36,6 +36,29 @@ func TestNewBuildsRootCommand(t *testing.T) {
 	}
 }
 
+func TestRunPrintsVersionInformation(t *testing.T) {
+	oldVersion, oldCommit, oldDate, oldBuiltBy := version, commit, date, builtBy
+	version, commit, date, builtBy = "1.2.3", "abc123", "2026-05-29T12:00:00Z", "test"
+	defer func() { version, commit, date, builtBy = oldVersion, oldCommit, oldDate, oldBuiltBy }()
+
+	cfg := viper.New()
+	loader := &fakeReviewLoader{files: minimalReviewFiles()}
+	runner := &fakeRunner{}
+	application, err := newApp(cfg, loader, runner)
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err = application.Run([]string{"version"}, &stdout, &stderr)
+	require.NoError(t, err)
+	assert.Empty(t, loader.requests)
+	assert.Empty(t, stderr.String())
+	assert.Contains(t, stdout.String(), "ero 1.2.3")
+	assert.Contains(t, stdout.String(), "commit: abc123")
+	assert.Contains(t, stdout.String(), "date: 2026-05-29T12:00:00Z")
+	assert.Contains(t, stdout.String(), "builtBy: test")
+}
+
 func TestRunClearsHelpFlagBetweenExecutions(t *testing.T) {
 	t.Parallel()
 
