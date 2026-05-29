@@ -43,6 +43,8 @@ type clipboardCopiedMsg struct {
 	text         string
 	lineCount    int
 	withMetadata bool
+	reviewJSON   bool
+	commentCount int
 }
 
 type clipboardCopyFailedMsg struct {
@@ -74,6 +76,8 @@ type Model struct {
 	nerdFont           bool
 	helpActive         bool
 	search             searchState
+	reviewDraft        *core.ReviewDraft
+	commentEditor      *InlineCommentEditor
 }
 
 func NewModel(files []core.ReviewFile) Model {
@@ -105,6 +109,7 @@ func NewModelWithClipboardWriter(files []core.ReviewFile, terminal ports.Termina
 		diffMode:        request.DiffMode,
 		nerdFont:        true,
 		search:          newSearchState(),
+		reviewDraft:     core.NewReviewDraft(),
 	}
 	if terminal != nil {
 		m.nerdFont = terminal.SupportsNerdFont()
@@ -130,6 +135,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selectedFile = 0
 		m.cursorRow = 0
 		m.clearSelection()
+		m.commentEditor = nil
+		m.reviewDraft = core.NewReviewDraft()
 		m.resetContextSelection()
 		m.reviewViewport.GotoTop()
 		m.syncReviewViewport()
@@ -147,6 +154,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case clipboardCopiedMsg:
 		m.lastCopiedText = msg.text
+		if msg.reviewJSON {
+			m.setCopyFeedback(fmt.Sprintf("Copied review JSON with %d %s", msg.commentCount, pluralize("comment", msg.commentCount)))
+			return m, m.expireCopyFeedbackCmd()
+		}
 		feedback := fmt.Sprintf("Copied %d %s", msg.lineCount, pluralize("line", msg.lineCount))
 		if msg.withMetadata {
 			feedback += " with metadata"
@@ -172,6 +183,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			default:
 				return m, nil
 			}
+		}
+		if m.commentEditor != nil {
+			return m.updateCommentEditor(msg)
 		}
 		if m.search.active() {
 			return m.updateSearch(msg)
@@ -199,6 +213,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleSelection()
 		case "esc":
 			m.clearSelection()
+		case "c":
+			return m.openCommentEditor()
+		case "C":
+			m.clearReviewDraft()
 		case "y":
 			return m.copyToClipboard(false)
 		case "Y":
@@ -259,6 +277,10 @@ func (m Model) View() tea.View {
 	}
 	view := tea.NewView(content)
 	view.AltScreen = true
+	if m.commentEditor != nil {
+		view.KeyboardEnhancements.ReportAllKeysAsEscapeCodes = true
+		view.KeyboardEnhancements.ReportAssociatedText = true
+	}
 	return view
 }
 
@@ -490,7 +512,12 @@ func (m *Model) selectNearestContextToCursor() {
 func (m *Model) syncReviewViewport() {
 	width := m.reviewWidth()
 	height := max(m.height-1, 1)
-	rendered := NewReviewDocument(width).RenderWithAnchors(m.files, m.selectedFile, m.selectedContext)
+	annotations := ReviewAnnotations{}
+	if m.reviewDraft != nil {
+		annotations.Comments = m.reviewDraft.Comments()
+	}
+	annotations.Editor = m.commentEditor
+	rendered := NewReviewDocument(width).RenderWithAnnotations(m.files, m.selectedFile, m.selectedContext, annotations)
 	currentCursor := m.cursorRow
 	m.reviewViewport.SetWidth(width)
 	m.reviewViewport.SetHeight(height)
@@ -595,7 +622,7 @@ func (m Model) reviewGutter(info viewport.GutterContext) string {
 	}
 	start, end, selected := m.selectedRange()
 	if info.Index == m.cursorRow {
-		return statusKeyStyle.Render("➜ ")
+		return statusKeyStyle.Render(nerdIconArrowRight + " ")
 	}
 	if selected && info.Index >= start && info.Index <= end {
 		return selectedExpander.Render("┃ ")
@@ -625,6 +652,10 @@ func (m *Model) toggleSelection() {
 
 func (m *Model) clearSelection() {
 	m.selectionAnchorRow = nil
+}
+
+func (m *Model) cancelCommentEditor() {
+	m.commentEditor = nil
 }
 
 func (m Model) copyToClipboard(withMetadata bool) (Model, tea.Cmd) {

@@ -226,7 +226,7 @@ func (c StatusBar) Render(model StatusModel) string {
 
 	middleLabel := model.CurrentFile
 	if model.Message != "" {
-		middleLabel = "➜ " + model.Message
+		middleLabel = nerdIconArrowRight + " " + model.Message
 	}
 	middleWidth := leftWidth - lipgloss.Width(prefix) - lipgloss.Width(percent)
 	middle := ""

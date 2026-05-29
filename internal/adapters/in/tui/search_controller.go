@@ -88,6 +88,7 @@ func (m *Model) jumpToFile(fileIndex int) {
 	}
 	m.selectedFile = fileIndex
 	m.clearSelection()
+	m.cancelCommentEditor()
 	m.resetContextSelection()
 	m.syncReviewViewport()
 	m.cursorRow = m.clampCursorRow(m.reviewAnchors.FileRows[fileIndex])
@@ -109,9 +110,11 @@ func (m *Model) jumpToLine(result SearchResult) {
 	if section.Kind == core.SectionKindContext && !contextLineVisible(*section, result.LineIndex) {
 		section.ExpandAll()
 		m.clearSelection()
+		m.cancelCommentEditor()
 	}
 	m.selectedFile = result.FileIndex
 	m.clearSelection()
+	m.cancelCommentEditor()
 	m.resetContextSelection()
 	m.syncReviewViewport()
 	anchor := ReviewLineAnchor{FileIndex: result.FileIndex, SectionIndex: result.SectionIndex, LineIndex: result.LineIndex}

@@ -102,7 +102,7 @@ func TestStartupPromptModelViewShowsOptions(t *testing.T) {
 	assert.Contains(t, view, "▸ Staged changes (s)")
 	assert.Contains(t, view, "Unstaged/untracked changes (u)")
 	assert.Contains(t, view, "All local changes (a)")
-	assert.Contains(t, view, "↑/↓ move • enter select • q quit")
+	assert.Contains(t, view, "↑/↓ move • "+enterKeyLabel()+" select • q quit")
 }
 
 func requireStartupPromptModel(t *testing.T, model tea.Model) startupPromptModel {

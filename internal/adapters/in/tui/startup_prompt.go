@@ -105,7 +105,7 @@ func (m startupPromptModel) View() tea.View {
 		lines = append(lines, cursor+labelStyle.Render(option.label)+" "+shortcut)
 		lines = append(lines, "    "+mutedStyle.Render(option.description))
 	}
-	lines = append(lines, "", mutedStyle.Render("↑/↓ move • enter select • q quit"))
+	lines = append(lines, "", mutedStyle.Render("↑/↓ move • "+enterKeyLabel()+" select • q quit"))
 	return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, lines...))
 }
 

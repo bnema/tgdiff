@@ -86,7 +86,7 @@ func contextBarLocationLabel(position ContextBarPosition) string {
 }
 
 func contextBarActionLabels() []string {
-	return []string{"[enter] show more", "[a] show all"}
+	return []string{"[" + enterKeyLabel() + "] show more", "[a] show all"}
 }
 
 func hiddenLinesLabel(hidden int) string {

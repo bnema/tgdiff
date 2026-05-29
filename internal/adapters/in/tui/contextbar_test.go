@@ -55,9 +55,9 @@ func TestReviewDocumentRendersContextualContextBars(t *testing.T) {
 
 	content := stripANSI(NewReviewDocument(120).Render(files, -1))
 
-	assert.Contains(t, content, "⋯ 2 hidden lines from beginning of file · [enter] show more · [a] show all")
-	assert.Contains(t, content, "⋯ 2 hidden lines between changes · [enter] show more · [a] show all")
-	assert.Contains(t, content, "⋯ 2 hidden lines to end of file · [enter] show more · [a] show all")
+	assert.Contains(t, content, "⋯ 2 hidden lines from beginning of file · ["+enterKeyLabel()+"] show more · [a] show all")
+	assert.Contains(t, content, "⋯ 2 hidden lines between changes · ["+enterKeyLabel()+"] show more · [a] show all")
+	assert.Contains(t, content, "⋯ 2 hidden lines to end of file · ["+enterKeyLabel()+"] show more · [a] show all")
 }
 
 func TestReviewDocumentRendersSingularOnlyContextBar(t *testing.T) {
@@ -74,7 +74,7 @@ func TestReviewDocumentRendersSingularOnlyContextBar(t *testing.T) {
 
 	content := stripANSI(NewReviewDocument(120).Render(files, -1))
 
-	assert.Contains(t, content, "⋯ 1 hidden line in file · [enter] show more · [a] show all")
+	assert.Contains(t, content, "⋯ 1 hidden line in file · ["+enterKeyLabel()+"] show more · [a] show all")
 }
 
 func TestModelCursorSelectsNearestContextBar(t *testing.T) {

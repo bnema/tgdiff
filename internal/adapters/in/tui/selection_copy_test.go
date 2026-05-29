@@ -48,7 +48,7 @@ func TestModelSelectionShortcutsToggleAndClearRange(t *testing.T) {
 			assert.Equal(t, tt.wantStart, start)
 			assert.Equal(t, tt.wantStart+1, end)
 			view := stripANSI(model.View().Content)
-			assert.Contains(t, view, "➜")
+			assert.Contains(t, view, nerdIconArrowRight)
 			assert.Contains(t, view, "┃")
 
 			updated, _ = model.Update(tt.clearKey)
