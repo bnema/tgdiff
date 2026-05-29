@@ -124,7 +124,7 @@ func (c ReviewDocument) RenderWithAnchors(files []core.ReviewFile, selectedFile,
 		rows = append(rows, ReviewRow{Kind: ReviewRowKindRule, FileIndex: fileIndex, FilePath: file.Path, Text: rule})
 
 		numberWidth := lineNumberWidth(file)
-		expander := NewContextExpander(c.width)
+		contextBar := NewContextBar(c.width)
 		for sectionIndex, section := range file.Sections {
 			selected := false
 			if fileIndex == selectedFile && section.Kind == core.SectionKindContext && section.HiddenLineCount() > 0 {
@@ -150,8 +150,8 @@ func (c ReviewDocument) RenderWithAnchors(files []core.ReviewFile, selectedFile,
 					lines = append(lines, renderedLine)
 					rows = append(rows, ReviewRow{Kind: ReviewRowKindLine, FileIndex: fileIndex, SectionIndex: sectionIndex, LineIndex: lineIndex, FilePath: file.Path, Line: line, Text: renderedLine, Selectable: true})
 				}
-				if hidden := section.HiddenLineCount(); hidden > 0 {
-					renderedExpander := expander.Render(hidden, selected)
+				if section.HiddenLineCount() > 0 {
+					renderedExpander := contextBar.View(NewContextBarViewModel(file, sectionIndex), selected)
 					lines = append(lines, renderedExpander)
 					rows = append(rows, ReviewRow{Kind: ReviewRowKindExpander, FileIndex: fileIndex, SectionIndex: sectionIndex, FilePath: file.Path, Text: renderedExpander, Selectable: true})
 				}
@@ -193,23 +193,6 @@ func fileStats(file core.ReviewFile) string {
 		}
 	}
 	return fmt.Sprintf("+%d -%d", added, deleted)
-}
-
-type ContextExpander struct {
-	width int
-}
-
-func NewContextExpander(width int) ContextExpander {
-	return ContextExpander{width: width}
-}
-
-func (c ContextExpander) Render(hidden int, selected bool) string {
-	label := fmt.Sprintf("⋯ %s · [a] above · [b] below · [enter] all", hiddenLinesLabel(hidden))
-	style := mutedStyle
-	if selected {
-		style = selectedExpander
-	}
-	return style.Width(c.width).Render(label)
 }
 
 type StatusModel struct {
@@ -451,11 +434,4 @@ func formatLineNumber(number, width int) string {
 		return strings.Repeat(" ", width)
 	}
 	return fmt.Sprintf("%*d", width, number)
-}
-
-func hiddenLinesLabel(hidden int) string {
-	if hidden == 1 {
-		return "1 hidden line"
-	}
-	return fmt.Sprintf("%d hidden lines", hidden)
 }
