@@ -6,7 +6,7 @@ import (
 
 	basechroma "github.com/alecthomas/chroma/v2"
 
-	"tgdiff/internal/ports"
+	"ero/internal/ports"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

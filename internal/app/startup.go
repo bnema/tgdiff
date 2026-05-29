@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 func resolveStartupRequest(request core.ReviewRequest, reader startupStateReader, prompt startupPrompt, isInteractive func() bool) (core.ReviewRequest, error) {
@@ -24,7 +24,7 @@ func resolveStartupRequest(request core.ReviewRequest, reader startupStateReader
 		return request, nil
 	case core.StartupDecisionPromptLocalChanges:
 		if isInteractive == nil || !isInteractive() {
-			return request, fmt.Errorf("mixed staged and worktree/untracked changes detected; choose explicitly: tgdiff staged, tgdiff working, or tgdiff local")
+			return request, fmt.Errorf("mixed staged and worktree/untracked changes detected; choose explicitly: ero staged, ero working, or ero local")
 		}
 		if prompt == nil {
 			return request, fmt.Errorf("startup prompt is nil")

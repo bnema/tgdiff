@@ -9,14 +9,14 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"tgdiff/internal/adapters/in/cli"
-	"tgdiff/internal/adapters/in/terminal"
-	"tgdiff/internal/adapters/in/tui"
-	clipboardadapter "tgdiff/internal/adapters/out/clipboard"
-	gitadapter "tgdiff/internal/adapters/out/git"
-	chromatokenizer "tgdiff/internal/adapters/out/syntax/chroma"
-	"tgdiff/internal/core"
-	"tgdiff/internal/ports"
+	"ero/internal/adapters/in/cli"
+	"ero/internal/adapters/in/terminal"
+	"ero/internal/adapters/in/tui"
+	clipboardadapter "ero/internal/adapters/out/clipboard"
+	gitadapter "ero/internal/adapters/out/git"
+	chromatokenizer "ero/internal/adapters/out/syntax/chroma"
+	"ero/internal/core"
+	"ero/internal/ports"
 )
 
 type reviewLoader interface {

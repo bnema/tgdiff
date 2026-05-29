@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 func TestModelViewUsesAlternateScreen(t *testing.T) {
@@ -54,7 +54,7 @@ func TestModelViewRendersSequentialReviewDocumentWithoutFileExplorer(t *testing.
 			model := NewModel(tt.files)
 			view := model.View().Content
 
-			assert.Contains(t, view, "tgdiff")
+			assert.Contains(t, view, "ero")
 			assert.NotContains(t, view, "Files")
 			assert.NotContains(t, view, "▸")
 			assert.Less(t, strings.Index(view, "alpha.go"), strings.Index(view, "zeta.go"))
@@ -124,7 +124,7 @@ func TestStatusBarFitsLongModeLabelToOneLine(t *testing.T) {
 	t.Parallel()
 
 	view := stripANSI(NewStatusBar(32).Render(StatusModel{
-		AppName:       "tgdiff",
+		AppName:       "ero",
 		Mode:          "upstream diff",
 		FileCount:     42,
 		CurrentFile:   "internal/adapters/in/tui/a-very-long-file-name.go",
@@ -140,7 +140,7 @@ func TestStatusBarTruncatesLongCurrentFileToOneLine(t *testing.T) {
 	t.Parallel()
 
 	model := StatusModel{
-		AppName:       "tgdiff",
+		AppName:       "ero",
 		Mode:          "review",
 		FileCount:     2,
 		CurrentFile:   "internal/adapters/in/tui/a-very-long-file-name.go",
@@ -181,7 +181,7 @@ func TestModelViewRendersPolishedStatusBar(t *testing.T) {
 
 			view := stripANSI(model.View().Content)
 
-			assert.Contains(t, view, "tgdiff")
+			assert.Contains(t, view, "ero")
 			assert.Contains(t, view, "1 file")
 			assert.Contains(t, view, "? help")
 			assert.NotContains(t, view, "j/k")

@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 type RunFunc func() error
@@ -31,7 +31,7 @@ func NewRootCommand(cfg *viper.Viper, run RunFunc) (*cobra.Command, error) {
 	}
 
 	cmd := &cobra.Command{
-		Use:          "tgdiff",
+		Use:          "ero",
 		Short:        "Review branch diffs in a GitHub-style TUI",
 		SilenceUsage: true,
 		RunE:         runWithReviewConfig(core.DiffModeBranch, reviewConfig{}),

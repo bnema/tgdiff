@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"tgdiff/internal/ports"
+	"ero/internal/ports"
 )
 
 type ReviewLoader struct {

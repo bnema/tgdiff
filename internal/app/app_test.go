@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 func TestNewBuildsRootCommand(t *testing.T) {
@@ -20,7 +20,7 @@ func TestNewBuildsRootCommand(t *testing.T) {
 		name      string
 		expectUse string
 	}{
-		{name: "default app", expectUse: "tgdiff"},
+		{name: "default app", expectUse: "ero"},
 	}
 
 	for _, tt := range tests {

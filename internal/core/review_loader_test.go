@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"tgdiff/internal/core"
-	"tgdiff/internal/ports/mocks"
+	"ero/internal/core"
+	"ero/internal/ports/mocks"
 )
 
 func TestReviewLoaderLoadBuildsReviewFilesAndAppliesSyntaxTokens(t *testing.T) {

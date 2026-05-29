@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 func TestFuzzyFileResultsMatchPathCharactersInOrder(t *testing.T) {
@@ -15,7 +15,7 @@ func TestFuzzyFileResultsMatchPathCharactersInOrder(t *testing.T) {
 	files := []core.ReviewFile{
 		reviewFile("internal/adapters/in/tui/model.go", "package tui"),
 		reviewFile("internal/core/review_loader.go", "package core"),
-		reviewFile("README.md", "# tgdiff"),
+		reviewFile("README.md", "# Ero"),
 	}
 
 	results := fuzzyFileResults(files, "tuim")

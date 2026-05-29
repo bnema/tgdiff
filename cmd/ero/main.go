@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"tgdiff/internal/app"
+	"ero/internal/app"
 )
 
 func main() {

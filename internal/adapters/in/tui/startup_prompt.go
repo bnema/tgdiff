@@ -6,7 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 type StartupPrompt struct{}

@@ -1,6 +1,6 @@
-# tgdiff
+# Ero
 
-Reusable Git diff review TUI in Go.
+Ero is a reusable Git diff review TUI in Go.
 
 ## v1 scope
 
@@ -16,7 +16,7 @@ Detailed layout: `docs/architecture.md`
 
 Key rules:
 
-- `cmd/tgdiff/main.go` stays minimal
+- `cmd/ero/main.go` stays minimal
 - `internal/app` is the composition root and dependency injection point
 - `internal/core` owns domain types plus core business/application services
 - `ports` live alongside `core`
@@ -28,7 +28,7 @@ Key rules:
 
 ## Current implementation
 
-- `cmd/tgdiff/main.go` is a minimal process entrypoint
+- `cmd/ero/main.go` is a minimal process entrypoint
 - `internal/app` wires the CLI, review loader, git adapter, syntax tokenizer, and TUI runner
 - git access uses `github.com/go-git/go-git/v5` (`v5.19.1`, latest stable; v6 is currently alpha)
 - the review loader:
@@ -51,20 +51,20 @@ Key rules:
 make test
 make mocks
 make install
-go run ./cmd/tgdiff --help
+go run ./cmd/ero --help
 ```
 
 Start modes:
 
 ```bash
-tgdiff                  # smart startup detection
-tgdiff branch           # working branch vs default branch
-tgdiff working          # unstaged working tree changes
-tgdiff staged           # staged changes
-tgdiff local            # staged + unstaged local changes
-tgdiff upstream [ref]   # against upstream, default @{upstream}
-tgdiff commit <rev>     # one commit
-tgdiff range <base> <head>
+ero                  # smart startup detection
+ero branch           # working branch vs default branch
+ero working          # unstaged working tree changes
+ero staged           # staged changes
+ero local            # staged + unstaged local changes
+ero upstream [ref]   # against upstream, default @{upstream}
+ero commit <rev>     # one commit
+ero range <base> <head>
 ```
 
 Smart startup detection chooses the first safe review scope:
@@ -82,4 +82,4 @@ Here, unstaged means modified tracked files; untracked means new files. Both are
 worktree changes for `working` and `local` reviews.
 
 When mixed local changes are detected in a non-interactive terminal, choose explicitly with
-`tgdiff staged`, `tgdiff working`, or `tgdiff local`.
+`ero staged`, `ero working`, or `ero local`.

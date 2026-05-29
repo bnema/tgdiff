@@ -1,4 +1,4 @@
-module tgdiff
+module ero
 
 go 1.26.3
 

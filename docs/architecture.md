@@ -1,4 +1,4 @@
-# tgdiff architecture
+# Ero architecture
 
 ## Principles
 
@@ -8,7 +8,7 @@
 - there is no separate `usecase` package in this project shape
 - `app` is the composition root and dependency injection point
 - adapters translate CLI, TUI, git, syntax, and future agent integrations
-- `cmd/tgdiff/main.go` stays minimal
+- `cmd/ero/main.go` stays minimal
 - the Bubble Tea root model stays thin
 - reusable TUI components own rendering and local interaction details
 - no ANSI strings or Lip Gloss styles in the core
@@ -30,7 +30,7 @@ That expansion behavior is domain business logic, so it belongs in the core revi
 ## Planned layout
 
 ```text
-cmd/tgdiff/main.go                  minimal process entrypoint only
+cmd/ero/main.go                  minimal process entrypoint only
 
 internal/app/                       composition root and dependency injection point
 internal/core/                      domain entities and core business/application services
@@ -53,7 +53,7 @@ test/                               integration fixtures and golden data
 
 ## Responsibilities by layer
 
-### `cmd/tgdiff/main.go`
+### `cmd/ero/main.go`
 
 Only:
 

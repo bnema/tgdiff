@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 func TestModelHelpModalShowsShortcutsAndCloses(t *testing.T) {

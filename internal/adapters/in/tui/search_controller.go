@@ -4,7 +4,7 @@ import (
 	"charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 func (m Model) openSearch(mode searchMode) (Model, tea.Cmd) {

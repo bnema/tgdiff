@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 func TestReviewDocumentHighlightsSelectedContextOnlyInSelectedFile(t *testing.T) {

@@ -15,4 +15,4 @@ mocks:
 	go run github.com/vektra/mockery/v3@$(MOCKERY_VERSION)
 
 install:
-	go install ./cmd/tgdiff
+	go install ./cmd/ero

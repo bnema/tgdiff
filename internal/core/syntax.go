@@ -1,6 +1,6 @@
 package core
 
-import "tgdiff/internal/ports"
+import "ero/internal/ports"
 
 type SemanticTokenType = ports.SemanticTokenType
 

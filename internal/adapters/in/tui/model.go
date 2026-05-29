@@ -11,8 +11,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"tgdiff/internal/core"
-	"tgdiff/internal/ports"
+	"ero/internal/core"
+	"ero/internal/ports"
 )
 
 const (
@@ -93,7 +93,7 @@ func NewModelWithClipboardWriter(files []core.ReviewFile, terminal ports.Termina
 		request.DiffMode = core.DiffModeBranch
 	}
 	m := Model{
-		title:           "tgdiff",
+		title:           "ero",
 		files:           sortedReviewFiles(files),
 		loader:          loader,
 		request:         request,

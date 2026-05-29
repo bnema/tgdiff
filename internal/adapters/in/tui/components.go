@@ -8,7 +8,7 @@ import (
 	basechroma "github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/styles"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 var (

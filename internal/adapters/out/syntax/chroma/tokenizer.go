@@ -8,7 +8,7 @@ import (
 	basechroma "github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/lexers"
 
-	"tgdiff/internal/ports"
+	"ero/internal/ports"
 )
 
 type Tokenizer struct {

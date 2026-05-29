@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 type SearchResult struct {

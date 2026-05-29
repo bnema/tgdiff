@@ -5,7 +5,7 @@
 package mocks
 
 import (
-	"tgdiff/internal/ports"
+	"ero/internal/ports"
 
 	mock "github.com/stretchr/testify/mock"
 )

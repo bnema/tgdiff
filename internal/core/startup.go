@@ -1,6 +1,6 @@
 package core
 
-// StartupState is the Git repository state used to infer what tgdiff should
+// StartupState is the Git repository state used to infer what ero should
 // show when the user starts the app without an explicit diff-mode command.
 type StartupState struct {
 	HasStagedChanges   bool

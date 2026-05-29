@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"tgdiff/internal/core"
-	"tgdiff/internal/ports/mocks"
+	"ero/internal/core"
+	"ero/internal/ports/mocks"
 )
 
 func TestDiffModeLabelUsesNerdFontWhenDetected(t *testing.T) {

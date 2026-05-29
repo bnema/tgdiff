@@ -13,7 +13,7 @@ import (
 	ggit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 type RepositoryLoader struct{}

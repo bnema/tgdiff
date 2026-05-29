@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 type ContextBarAction string

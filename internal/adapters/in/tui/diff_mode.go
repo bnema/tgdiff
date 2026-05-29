@@ -3,7 +3,7 @@ package tui
 import (
 	"strings"
 
-	"tgdiff/internal/core"
+	"ero/internal/core"
 )
 
 const (
