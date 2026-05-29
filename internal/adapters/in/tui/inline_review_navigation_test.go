@@ -29,7 +29,9 @@ func TestModelReloadClearsDraftAndCommentEditor(t *testing.T) {
 	t.Parallel()
 
 	model := NewModel([]core.ReviewFile{reviewFileWithLines("a.go", 1)})
-	updated, _ := model.Update(keyPress("c"))
+	updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+	model = updated.(Model)
+	updated, _ = model.Update(keyPress("c"))
 	model = updated.(Model)
 	require.NotNil(t, model.commentEditor)
 	_, err := model.reviewDraft.AddComment(core.ReviewCommentInput{FilePath: "a.go", Range: core.ReviewLineRange{Start: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, End: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}}, Body: "old"})

@@ -72,7 +72,7 @@ func (e CommentEditor) View() string {
 }
 
 func (e CommentEditor) ViewWithWidth(availableWidth int) string {
-	width := min(max(availableWidth-8, 24), max(availableWidth, 24))
+	width := max(availableWidth-8, 24)
 	input := e.input
 	input.SetWidth(max(width-4, 20))
 	lines := []string{

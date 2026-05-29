@@ -18,6 +18,7 @@ func TestModelRequestsKeyboardEnhancementsWhileCommentEditorIsActive(t *testing.
 	model = updated.(Model)
 
 	view := model.View()
+	assert.Nil(t, model.commentEditor)
 	assert.False(t, view.KeyboardEnhancements.ReportAllKeysAsEscapeCodes)
 	assert.False(t, view.KeyboardEnhancements.ReportAssociatedText)
 

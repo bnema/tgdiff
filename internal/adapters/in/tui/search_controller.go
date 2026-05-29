@@ -110,7 +110,6 @@ func (m *Model) jumpToLine(result SearchResult) {
 	if section.Kind == core.SectionKindContext && !contextLineVisible(*section, result.LineIndex) {
 		section.ExpandAll()
 		m.clearSelection()
-		m.cancelCommentEditor()
 	}
 	m.selectedFile = result.FileIndex
 	m.clearSelection()

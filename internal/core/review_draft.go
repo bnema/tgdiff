@@ -52,9 +52,6 @@ func (d *ReviewDraft) AddComment(input ReviewCommentInput) (ReviewComment, error
 	if err := validateReviewCommentInput(input); err != nil {
 		return ReviewComment{}, err
 	}
-	if d.nextID <= 0 {
-		d.nextID = 1
-	}
 	comment := ReviewComment{
 		ID:       fmt.Sprintf("comment-%d", d.nextID),
 		FilePath: strings.TrimSpace(input.FilePath),
