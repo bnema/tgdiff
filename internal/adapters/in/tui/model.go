@@ -657,7 +657,11 @@ func (m *Model) clearSelection() {
 }
 
 func (m *Model) cancelCommentEditor() {
+	if m.commentEditor == nil {
+		return
+	}
 	m.commentEditor = nil
+	m.syncReviewViewport()
 }
 
 func (m Model) copyToClipboard(withMetadata bool) (Model, tea.Cmd) {

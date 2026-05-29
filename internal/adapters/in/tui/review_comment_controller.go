@@ -30,8 +30,7 @@ func (m Model) updateCommentEditor(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	m.commentEditor.Editor = updatedEditor
 	switch action {
 	case CommentEditorActionCancel:
-		m.commentEditor = nil
-		m.syncReviewViewport()
+		m.cancelCommentEditor()
 		return m, nil
 	case CommentEditorActionSubmit:
 		return m.submitCommentEditor()
@@ -58,8 +57,7 @@ func (m Model) submitCommentEditor() (Model, tea.Cmd) {
 		m.setCopyFeedback(err.Error())
 		return m, nil
 	}
-	m.commentEditor = nil
-	m.syncReviewViewport()
+	m.cancelCommentEditor()
 	return m.copyReviewJSONToClipboard()
 }
 
@@ -93,7 +91,7 @@ func (m *Model) clearReviewDraft() {
 		m.reviewDraft = core.NewReviewDraft()
 	}
 	m.reviewDraft.Clear()
-	m.commentEditor = nil
+	m.cancelCommentEditor()
 	m.setCopyFeedback("Cleared review")
 	m.syncReviewViewport()
 }

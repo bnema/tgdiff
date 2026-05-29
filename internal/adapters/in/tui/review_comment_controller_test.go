@@ -26,6 +26,18 @@ func TestReviewCommentRangeFromRowsUsesSelectionEndpoints(t *testing.T) {
 	assert.Equal(t, core.ReviewLineRef{OldLineNumber: 12, Kind: core.LineKindDeleted}, lineRange.End)
 }
 
+func TestReviewCommentRangeFromRowsRejectsNonLineRows(t *testing.T) {
+	t.Parallel()
+
+	_, _, ok := reviewCommentRangeFromRows([]ReviewRow{
+		{Kind: ReviewRowKindLine, FilePath: "demo.go", Line: core.ReviewLine{NewLineNumber: 1, Kind: core.LineKindAdded}},
+		{Kind: ReviewRowKindExpander, FilePath: "demo.go"},
+		{Kind: ReviewRowKindLine, FilePath: "demo.go", Line: core.ReviewLine{NewLineNumber: 2, Kind: core.LineKindAdded}},
+	})
+
+	assert.False(t, ok)
+}
+
 func TestReviewCommentRangeFromRowsRejectsEmptyAndCrossFileSelections(t *testing.T) {
 	t.Parallel()
 
