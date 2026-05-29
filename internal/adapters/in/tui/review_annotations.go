@@ -5,6 +5,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	"ero/internal/adapters/in/tui/render"
 	"ero/internal/core"
 )
 
@@ -106,7 +107,7 @@ func reviewLineMatchesRef(line core.ReviewLine, ref core.ReviewLineRef) bool {
 func reviewLineContentIndents(files []core.ReviewFile) map[int]string {
 	indents := make(map[int]string, len(files))
 	for fileIndex, file := range files {
-		indents[fileIndex] = strings.Repeat(" ", lineNumberWidth(file)*2+4)
+		indents[fileIndex] = strings.Repeat(" ", render.LineNumberWidth(file)*2+4)
 	}
 	return indents
 }

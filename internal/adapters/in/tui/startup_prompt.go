@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"ero/internal/adapters/in/tui/theme"
 	"ero/internal/core"
 )
 
@@ -92,7 +93,7 @@ func (m startupPromptModel) shortcutIndex(key string) (int, bool) {
 
 func (m startupPromptModel) View() tea.View {
 	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")).Render("Mixed local changes detected")
-	subtitle := mutedStyle.Render("Choose the diff scope to review")
+	subtitle := theme.MutedStyle.Render("Choose the diff scope to review")
 	lines := []string{title, subtitle, ""}
 	for i, option := range m.options {
 		cursor := "  "
@@ -101,11 +102,11 @@ func (m startupPromptModel) View() tea.View {
 			cursor = "▸ "
 			labelStyle = labelStyle.Bold(true).Foreground(lipgloss.Color("86"))
 		}
-		shortcut := mutedStyle.Render("(" + option.key + ")")
+		shortcut := theme.MutedStyle.Render("(" + option.key + ")")
 		lines = append(lines, cursor+labelStyle.Render(option.label)+" "+shortcut)
-		lines = append(lines, "    "+mutedStyle.Render(option.description))
+		lines = append(lines, "    "+theme.MutedStyle.Render(option.description))
 	}
-	lines = append(lines, "", mutedStyle.Render("↑/↓ move • "+enterKeyLabel()+" select • q quit"))
+	lines = append(lines, "", theme.MutedStyle.Render("↑/↓ move • "+enterKeyLabel()+" select • q quit"))
 	return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, lines...))
 }
 
