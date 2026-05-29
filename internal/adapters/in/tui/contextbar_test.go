@@ -157,7 +157,9 @@ func TestModelEnterShowsMoreContextBarUnderCursor(t *testing.T) {
 	require.Equal(t, 0, model.files[0].Sections[2].ExpandedAbove)
 
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(Model)
+	updatedModel, ok := updated.(Model)
+	require.True(t, ok)
+	model = updatedModel
 
 	assert.Equal(t, 0, model.files[0].Sections[0].ExpandedAbove)
 	assert.Equal(t, 2, model.files[0].Sections[2].ExpandedAbove)
@@ -199,7 +201,9 @@ func TestModelEnterShowsMoreAtFileEdges(t *testing.T) {
 			model.cursorRow = expanderRowForSection(t, model, 0, tt.sectionIndex)
 
 			updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-			model = updated.(Model)
+			updatedModel, ok := updated.(Model)
+			require.True(t, ok)
+			model = updatedModel
 
 			tt.assertState(t, model.files[0].Sections[tt.sectionIndex])
 		})
@@ -213,7 +217,9 @@ func TestModelAShowsAllContextBarUnderCursor(t *testing.T) {
 	model.cursorRow = expanderRowForSection(t, model, 0, 0)
 
 	updated, _ := model.Update(keyPress("a"))
-	model = updated.(Model)
+	updatedModel, ok := updated.(Model)
+	require.True(t, ok)
+	model = updatedModel
 
 	assert.Equal(t, 0, model.files[0].Sections[0].HiddenLineCount())
 }
@@ -234,7 +240,9 @@ func TestModelDoesNotExpandStaleContextWhenCursorFileHasNoExpanders(t *testing.T
 	model.selectNearestContextToCursor()
 
 	updated, _ := model.Update(keyPress("a"))
-	model = updated.(Model)
+	updatedModel, ok := updated.(Model)
+	require.True(t, ok)
+	model = updatedModel
 
 	assert.Equal(t, 0, model.files[0].Sections[0].ExpandedAbove)
 	assert.Equal(t, 0, model.files[0].Sections[0].ExpandedBelow)
@@ -261,7 +269,9 @@ func TestModelEnterShowsMoreContextBarUnderCursorAcrossFiles(t *testing.T) {
 	model.cursorRow = expanderRowForSection(t, model, 1, 2)
 
 	updated, _ := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	model = updated.(Model)
+	updatedModel, ok := updated.(Model)
+	require.True(t, ok)
+	model = updatedModel
 
 	assert.Equal(t, 0, model.files[0].Sections[2].ExpandedAbove)
 	assert.Equal(t, 2, model.files[1].Sections[2].ExpandedAbove)
