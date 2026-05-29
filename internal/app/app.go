@@ -95,6 +95,7 @@ func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner
 	if err != nil {
 		return nil, fmt.Errorf("build root command: %w", err)
 	}
+	root.AddCommand(versionCommand())
 
 	return &App{
 		config: cfg,

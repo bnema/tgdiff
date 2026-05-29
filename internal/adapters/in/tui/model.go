@@ -273,20 +273,6 @@ func (m *Model) moveFile(delta int) {
 	m.syncReviewViewport()
 }
 
-func (m *Model) moveContext(delta int) {
-	indexes := m.selectableContextSectionIndexes()
-	if len(indexes) == 0 {
-		m.selectedContext = -1
-		return
-	}
-	if m.selectedContext < 0 {
-		m.selectedContext = 0
-		return
-	}
-
-	m.selectedContext = min(max(m.selectedContext+delta, 0), len(indexes)-1)
-}
-
 func (m *Model) showMoreContext(count int) {
 	fileIndex, sectionIndex, ok := m.contextSectionLocationForExpansion()
 	if !ok || !m.contextBarActionAllowed(fileIndex, sectionIndex, ContextBarActionShowMore) {
