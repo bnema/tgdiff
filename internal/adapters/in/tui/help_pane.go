@@ -33,6 +33,7 @@ func renderHelpPane(width, height int) string {
 		renderHelpShortcut("s/space", "select lines", contentWidth),
 		renderHelpShortcut("c", "comment selection", contentWidth),
 		renderHelpShortcut("C", "clear review", contentWidth),
+		renderHelpShortcut("R", "copy review JSON", contentWidth),
 		renderHelpShortcut("y/Y", "copy plain/rich", contentWidth),
 		renderHelpShortcut("q", "quit", contentWidth),
 		"",

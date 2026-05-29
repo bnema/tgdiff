@@ -78,6 +78,7 @@ func (m Model) copyReviewJSONToClipboard() (Model, tea.Cmd) {
 	}
 	text := string(payload)
 	commentCount := len(m.reviewDraft.Comments())
+	m.setCopyFeedback("Copying review JSON…")
 	writer := m.clipboardWriter
 	return m, func() tea.Msg {
 		if err := writer.WriteClipboard(context.Background(), text); err != nil {

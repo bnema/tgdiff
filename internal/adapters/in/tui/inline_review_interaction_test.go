@@ -45,9 +45,32 @@ func TestModelInlineCommentSubmitCopiesReviewJSON(t *testing.T) {
 
 	assert.Nil(t, model.commentEditor)
 	assert.Len(t, model.reviewDraft.Comments(), 1)
-	assert.Contains(t, model.copyFeedback, "Copied review JSON with 1 comment")
+	assert.Contains(t, model.copyFeedback, "Review JSON copied (1 comment)")
 	assert.Contains(t, model.lastCopiedText, "review note")
 	assert.Contains(t, stripANSI(model.View().Content), "review note")
+}
+
+func TestModelCopyReviewShortcutCopiesCurrentReviewJSON(t *testing.T) {
+	t.Parallel()
+
+	clipboard := mocks.NewMockClipboardWriter(t)
+	model := NewModelWithClipboardWriter([]core.ReviewFile{reviewFileWithLines("demo.go", 1)}, nil, nil, core.ReviewRequest{DiffMode: core.DiffModeBranch}, clipboard)
+	_, err := model.reviewDraft.AddComment(core.ReviewCommentInput{FilePath: "demo.go", Range: core.ReviewLineRange{Start: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, End: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}}, Body: "manual copy"})
+	require.NoError(t, err)
+
+	clipboard.EXPECT().WriteClipboard(mock.Anything, mock.MatchedBy(func(text string) bool {
+		return strings.Contains(text, `"body": "manual copy"`) && strings.Contains(text, `"comments"`)
+	})).Return(nil).Once()
+	updated, cmd := model.Update(keyPress("R"))
+	model = updated.(Model)
+	require.NotNil(t, cmd)
+	assert.Equal(t, "Copying review JSON…", model.copyFeedback)
+	assert.Contains(t, stripANSI(model.View().Content), "Copying review JSON")
+	updated, _ = model.Update(cmd())
+	model = updated.(Model)
+
+	assert.Contains(t, model.copyFeedback, "Review JSON copied (1 comment)")
+	assert.Contains(t, model.lastCopiedText, "manual copy")
 }
 
 func TestModelInlineCommentCancelAndClear(t *testing.T) {

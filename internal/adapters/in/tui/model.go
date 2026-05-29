@@ -155,7 +155,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clipboardCopiedMsg:
 		m.lastCopiedText = msg.text
 		if msg.reviewJSON {
-			m.setCopyFeedback(fmt.Sprintf("Copied review JSON with %d %s", msg.commentCount, pluralize("comment", msg.commentCount)))
+			m.setCopyFeedback(fmt.Sprintf("Review JSON copied (%d %s)", msg.commentCount, pluralize("comment", msg.commentCount)))
 			return m, m.expireCopyFeedbackCmd()
 		}
 		feedback := fmt.Sprintf("Copied %d %s", msg.lineCount, pluralize("line", msg.lineCount))
@@ -217,6 +217,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.openCommentEditor()
 		case "C":
 			m.clearReviewDraft()
+		case "R":
+			return m.copyReviewJSONToClipboard()
 		case "y":
 			return m.copyToClipboard(false)
 		case "Y":

@@ -9,7 +9,11 @@ import (
 )
 
 var (
-	inlineCommentStyle = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("62")).PaddingLeft(1).Foreground(lipgloss.Color("252"))
+	inlineCommentStyle      = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("62")).PaddingLeft(1)
+	inlineCommentIconStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true)
+	inlineCommentIDStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Bold(true)
+	inlineCommentBodyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("248"))
+	inlineCommentMutedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )
 
 type ReviewAnnotations struct {
@@ -117,9 +121,17 @@ func inlineAnnotationIndent(row ReviewRow, lineIndents map[int]string) string {
 func renderInlineComment(comment core.ReviewComment, indent string) []string {
 	bodyLines := strings.Split(comment.Body, "\n")
 	lines := make([]string, 0, len(bodyLines)+1)
-	lines = append(lines, indent+inlineCommentStyle.Render(nerdIconComment+" "+comment.ID))
+	header := inlineCommentIconStyle.Render(nerdIconComment) + " " + inlineCommentIDStyle.Render(displayReviewCommentID(comment.ID))
+	lines = append(lines, indent+inlineCommentStyle.Render(header))
 	for _, bodyLine := range bodyLines {
-		lines = append(lines, indent+inlineCommentStyle.Render(bodyLine))
+		lines = append(lines, indent+inlineCommentStyle.Render(inlineCommentBodyStyle.Render(bodyLine)))
 	}
 	return lines
+}
+
+func displayReviewCommentID(id string) string {
+	if number, ok := strings.CutPrefix(id, "comment-"); ok && number != "" {
+		return "#" + number
+	}
+	return inlineCommentMutedStyle.Render(id)
 }
