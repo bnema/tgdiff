@@ -203,9 +203,9 @@ func (m Model) updateReviewAction(action keymap.Action, msg tea.KeyPressMsg) (te
 	case keymap.ActionMoveDown:
 		m.moveCursor(1)
 	case keymap.ActionPageUp:
-		m.moveCursor(-m.reviewViewport.Height())
+		m.pageCursor(-1)
 	case keymap.ActionPageDown:
-		m.moveCursor(m.reviewViewport.Height())
+		m.pageCursor(1)
 	case keymap.ActionMoveStart:
 		m.moveCursorToStart()
 	case keymap.ActionMoveEnd:

@@ -29,20 +29,45 @@ func (m *Model) syncReviewViewport() {
 
 func (m *Model) moveCursor(delta int) {
 	m.cursorRow = m.selectableRowFrom(m.cursorRow, delta)
-	m.selectNearestContextToCursor()
-	m.syncReviewViewport()
+	m.updateAfterCursorMove()
 }
 
 func (m *Model) moveCursorToStart() {
 	m.cursorRow = m.firstSelectableRow()
-	m.selectNearestContextToCursor()
-	m.syncReviewViewport()
+	m.updateAfterCursorMoveWithOffset(0)
 }
 
 func (m *Model) moveCursorToEnd() {
 	m.cursorRow = m.lastSelectableRow()
+	m.updateAfterCursorMoveWithOffset(m.cursorRow - m.reviewViewport.Height() + 1)
+}
+
+func (m *Model) pageCursor(direction int) {
+	if direction == 0 {
+		return
+	}
+	height := max(m.reviewViewport.Height(), 1)
+	m.cursorRow = m.selectableRowFrom(m.cursorRow, direction*height)
+	m.updateAfterCursorMoveWithOffset(m.reviewViewport.YOffset() + direction*height)
+}
+
+func (m *Model) updateAfterCursorMove() {
+	m.updateAfterCursorMoveWithOffset(m.reviewViewport.YOffset())
+}
+
+func (m *Model) updateAfterCursorMoveWithOffset(preferredOffset int) {
+	previousFile := m.selectedFile
+	previousContext := m.selectedContext
 	m.selectNearestContextToCursor()
-	m.syncReviewViewport()
+	if m.selectedFile != previousFile || m.selectedContext != previousContext {
+		m.syncReviewViewport()
+		m.reviewViewport.SetYOffset(preferredOffset)
+		m.keepCursorVisible()
+		return
+	}
+	m.reviewViewport.SetYOffset(preferredOffset)
+	m.keepCursorVisible()
+	m.updateActiveFileFromCursor()
 }
 
 func (m Model) clampCursorRow(row int) int {
@@ -101,6 +126,21 @@ func (m Model) lastSelectableRow() int {
 
 func (m *Model) centerViewportOnCursor() {
 	m.reviewViewport.SetYOffset(m.cursorRow - m.reviewViewport.Height()/2)
+}
+
+func (m *Model) keepCursorVisible() {
+	height := m.reviewViewport.Height()
+	if height <= 0 {
+		return
+	}
+	top := m.reviewViewport.YOffset()
+	bottom := top + height - 1
+	switch {
+	case m.cursorRow < top:
+		m.reviewViewport.SetYOffset(m.cursorRow)
+	case m.cursorRow > bottom:
+		m.reviewViewport.SetYOffset(m.cursorRow - height + 1)
+	}
 }
 
 func (m *Model) updateActiveFileFromCursor() {

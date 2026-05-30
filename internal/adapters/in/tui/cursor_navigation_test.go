@@ -10,29 +10,32 @@ import (
 	"ero/internal/core"
 )
 
-func TestModelCursorNavigationCentersViewportWithJK(t *testing.T) {
+func TestModelCursorNavigationKeepsCursorVisibleWithoutRebuildingDocument(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		keys       []tea.KeyPressMsg
-		wantCursor int
+		name            string
+		keys            []tea.KeyPressMsg
+		wantCursor      int
+		wantViewportTop int
 	}{
 		{
-			name: "j moves cursor down and keeps it near viewport center",
+			name: "j moves cursor down and scrolls only when needed",
 			keys: []tea.KeyPressMsg{
 				keyPress("j"), keyPress("j"), keyPress("j"), keyPress("j"), keyPress("j"),
 				keyPress("j"), keyPress("j"), keyPress("j"), keyPress("j"), keyPress("j"),
 			},
-			wantCursor: 12,
+			wantCursor:      12,
+			wantViewportTop: 4,
 		},
 		{
-			name: "down moves cursor down and keeps it near viewport center",
+			name: "down moves cursor down and scrolls only when needed",
 			keys: []tea.KeyPressMsg{
 				{Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown},
 				{Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown}, {Code: tea.KeyDown},
 			},
-			wantCursor: 12,
+			wantCursor:      12,
+			wantViewportTop: 4,
 		},
 	}
 
@@ -43,6 +46,8 @@ func TestModelCursorNavigationCentersViewportWithJK(t *testing.T) {
 			model := NewModel([]core.ReviewFile{reviewFileWithLines("demo.go", 80)})
 			updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
 			model = updated.(Model)
+			initialRows := model.reviewRows
+			initialContent := model.reviewViewport.GetContent()
 
 			for _, key := range tt.keys {
 				updated, _ = model.Update(key)
@@ -50,23 +55,29 @@ func TestModelCursorNavigationCentersViewportWithJK(t *testing.T) {
 			}
 
 			require.Equal(t, tt.wantCursor, model.cursorRow)
-			assert.Equal(t, model.cursorRow-model.reviewViewport.Height()/2, model.reviewViewport.YOffset())
-			assert.Equal(t, model.reviewViewport.Height()/2, model.cursorRow-model.reviewViewport.YOffset())
+			assert.Equal(t, tt.wantViewportTop, model.reviewViewport.YOffset())
+			assert.Same(t, &initialRows[0], &model.reviewRows[0])
+			assert.Equal(t, initialContent, model.reviewViewport.GetContent())
+			assert.LessOrEqual(t, model.reviewViewport.YOffset(), model.cursorRow)
+			assert.Less(t, model.cursorRow, model.reviewViewport.YOffset()+model.reviewViewport.Height())
 		})
 	}
 }
 
-func TestModelCursorNavigationClampsAtDocumentEdges(t *testing.T) {
+func TestModelCursorNavigationPreservesAbsoluteAndPageViewportSemantics(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name            string
+		setupKeys       []tea.KeyPressMsg
 		key             tea.KeyPressMsg
 		wantCursor      int
 		wantViewportTop int
 	}{
-		{name: "home clamps to first selectable review row", key: tea.KeyPressMsg{Code: tea.KeyHome}, wantCursor: 2, wantViewportTop: 0},
-		{name: "end clamps to last selectable review row", key: tea.KeyPressMsg{Code: tea.KeyEnd}, wantCursor: 21, wantViewportTop: 17},
+		{name: "home clamps to true viewport top after scrolling", setupKeys: repeatKey(tea.KeyPressMsg{Code: tea.KeyDown}, 10), key: tea.KeyPressMsg{Code: tea.KeyHome}, wantCursor: 2, wantViewportTop: 0},
+		{name: "end clamps to last selectable row and shows document bottom", key: tea.KeyPressMsg{Code: tea.KeyEnd}, wantCursor: 21, wantViewportTop: 17},
+		{name: "page down moves viewport by one page from top", key: tea.KeyPressMsg{Code: tea.KeyPgDown}, wantCursor: 7, wantViewportTop: 5},
+		{name: "page up moves viewport by one page after scrolling", setupKeys: repeatKey(tea.KeyPressMsg{Code: tea.KeyPgDown}, 2), key: tea.KeyPressMsg{Code: tea.KeyPgUp}, wantCursor: 7, wantViewportTop: 5},
 	}
 
 	for _, tt := range tests {
@@ -77,6 +88,11 @@ func TestModelCursorNavigationClampsAtDocumentEdges(t *testing.T) {
 			updated, _ := model.Update(tea.WindowSizeMsg{Width: 80, Height: 6})
 			model = updated.(Model)
 
+			for _, key := range tt.setupKeys {
+				updated, _ = model.Update(key)
+				model = updated.(Model)
+			}
+
 			updated, _ = model.Update(tt.key)
 			model = updated.(Model)
 
@@ -84,6 +100,14 @@ func TestModelCursorNavigationClampsAtDocumentEdges(t *testing.T) {
 			assert.Equal(t, tt.wantViewportTop, model.reviewViewport.YOffset())
 		})
 	}
+}
+
+func repeatKey(key tea.KeyPressMsg, count int) []tea.KeyPressMsg {
+	keys := make([]tea.KeyPressMsg, count)
+	for i := range keys {
+		keys[i] = key
+	}
+	return keys
 }
 
 func TestModelJumpsUpdateCursorRow(t *testing.T) {
