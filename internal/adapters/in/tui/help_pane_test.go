@@ -22,6 +22,9 @@ func TestModelHelpModalShowsShortcutsAndCloses(t *testing.T) {
 	assert.Contains(t, view, "find file")
 	assert.Contains(t, view, "grep references")
 	assert.Contains(t, view, "select result")
+	assert.Contains(t, view, "a             expand all")
+	assert.Contains(t, view, "expand more")
+	assert.NotContains(t, view, "a/b")
 
 	updated, _ = model.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
 	model = updated.(Model)
