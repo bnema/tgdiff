@@ -16,37 +16,56 @@ export default function eroPiCodingAgentBridge(pi) {
 
   const server = createServer((conn) => {
     let data = "";
+    let closed = false;
+    let rejected = false;
+
+    function respond(response) {
+      if (closed || conn.destroyed || conn.writableEnded) return;
+      closed = true;
+      conn.end(JSON.stringify(response) + "\n");
+    }
+
     conn.setEncoding("utf8");
+    conn.on("error", () => {
+      closed = true;
+    });
     conn.on("data", (chunk) => {
+      if (rejected) return;
       data += chunk;
       if (data.length > 1024 * 1024) {
-        conn.end(JSON.stringify({ ok: false, error: "request body too large" }) + "\n");
-        conn.destroy();
+        rejected = true;
+        respond({ ok: false, error: "request body too large" });
       }
     });
-    conn.on("end", async () => {
+    conn.on("end", () => {
+      if (rejected || closed) return;
+
       let payload;
       try {
         payload = JSON.parse(data);
       } catch (_error) {
-        conn.end(JSON.stringify({ ok: false, error: "invalid json" }) + "\n");
+        respond({ ok: false, error: "invalid json" });
         return;
       }
 
       if (!currentSessionId || payload.session_id !== currentSessionId || payload.token !== token) {
-        conn.end(JSON.stringify({ ok: false, error: "invalid bridge token or session" }) + "\n");
+        respond({ ok: false, error: "invalid bridge token or session" });
         return;
       }
       if (!payload.message?.trim()) {
-        conn.end(JSON.stringify({ ok: false, error: "message is required" }) + "\n");
+        respond({ ok: false, error: "message is required" });
         return;
       }
 
       try {
-        await pi.sendUserMessage(payload.message, { deliverAs: "followUp" });
-        conn.end(JSON.stringify({ ok: true }) + "\n");
+        const delivery = Promise.resolve(pi.sendUserMessage(payload.message, { deliverAs: "followUp" }));
+        respond({ ok: true });
+        delivery.catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          pi.ui?.notify?.(`Ero bridge failed to deliver review: ${message}`, "error");
+        });
       } catch (error) {
-        conn.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }) + "\n");
+        respond({ ok: false, error: error instanceof Error ? error.message : String(error) });
       }
     });
   });
