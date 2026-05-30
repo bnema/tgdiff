@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/stretchr/testify/assert"
 
 	"ero/internal/core"
@@ -64,6 +65,43 @@ func TestReviewLine(t *testing.T) {
 			if tt.stripped != "" {
 				assert.Contains(t, stripANSI(rendered), tt.stripped)
 			}
+		})
+	}
+}
+
+func TestApplySyntaxHighlightingSkipsAlreadyRenderedTokenRanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		tokens []core.SyntaxToken
+		want   string
+	}{
+		{
+			name: "overlapping token starts inside previous token",
+			tokens: []core.SyntaxToken{
+				{Start: 0, End: 4, Type: core.SemanticTokenKeyword},
+				{Start: 2, End: 6, Type: core.SemanticTokenFunction},
+			},
+			want: "abcdef",
+		},
+		{
+			name: "out of order token is skipped after later range rendered",
+			tokens: []core.SyntaxToken{
+				{Start: 2, End: 4, Type: core.SemanticTokenKeyword},
+				{Start: 0, End: 2, Type: core.SemanticTokenFunction},
+			},
+			want: "abcdef",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rendered := ApplySyntaxHighlighting("abcdef", tt.tokens, lipgloss.NewStyle())
+
+			assert.Equal(t, tt.want, stripANSI(rendered))
 		})
 	}
 }

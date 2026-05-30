@@ -51,7 +51,8 @@ func applySyntaxHighlighting(content string, tokens []core.SyntaxToken, baseStyl
 	for _, token := range tokens {
 		start := min(max(token.Start, 0), len(runes))
 		end := min(max(token.End, 0), len(runes))
-		if start >= end {
+		start = max(start, lastEnd)
+		if end <= lastEnd || start >= end {
 			continue
 		}
 		if start > lastEnd {
