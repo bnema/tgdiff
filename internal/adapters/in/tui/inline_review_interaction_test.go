@@ -50,6 +50,28 @@ func TestModelInlineCommentSubmitCopiesReviewJSON(t *testing.T) {
 	assert.Contains(t, stripANSI(model.View().Content), "review note")
 }
 
+func TestModelInlineCommentSubmitWithProviderDoesNotCopyReviewJSON(t *testing.T) {
+	clipboard := mocks.NewMockClipboardWriter(t)
+	model := NewModelWithClipboardWriter([]core.ReviewFile{reviewFileWithLines("demo.go", 1)}, nil, nil, core.ReviewRequest{DiffMode: core.DiffModeBranch}, clipboard)
+	model.providerInfos = []core.ReviewProviderInfo{{ID: "pi-coding-agent", Label: "pi-coding-agent", Capabilities: core.ReviewProviderCapabilities{PublishReview: true}}}
+
+	updated, _ := model.Update(keyPress("c"))
+	model = updated.(Model)
+	for _, r := range "review note" {
+		updated, _ = model.Update(tea.KeyPressMsg{Text: string(r), Code: r})
+		model = updated.(Model)
+	}
+
+	updated, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModCtrl})
+	model = updated.(Model)
+
+	require.NotNil(t, cmd)
+	assert.Nil(t, model.commentEditor)
+	assert.Len(t, model.reviewDraft.Comments(), 1)
+	assert.Contains(t, model.copyFeedback, "Comment added; press P to publish")
+	assert.Empty(t, model.lastCopiedText)
+}
+
 func TestModelCopyReviewShortcutCopiesCurrentReviewJSON(t *testing.T) {
 	t.Parallel()
 

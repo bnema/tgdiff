@@ -12,6 +12,22 @@ import (
 	"ero/internal/ports"
 )
 
+func TestUppercasePOpensPublishOverlayWithProvider(t *testing.T) {
+	provider := &fakeReviewProvider{info: core.ReviewProviderInfo{ID: "pi-coding-agent", Label: "pi-coding-agent", Capabilities: core.ReviewProviderCapabilities{PublishReview: true}}}
+	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
+	m.reviewProviders = []ports.ReviewProviderClient{fakeProviderAsPort{provider}}
+	m.providerInfos = []core.ReviewProviderInfo{provider.info}
+	m.providerInfoByClient = map[ports.ReviewProviderClient]core.ReviewProviderInfo{m.reviewProviders[0]: provider.info}
+
+	updated, cmd := m.Update(keyPress("P"))
+	m = updated.(Model)
+
+	require.Nil(t, cmd)
+	require.True(t, m.publish.active)
+	require.True(t, m.publish.selected["pi-coding-agent"])
+	require.Contains(t, stripANSI(m.View().Content), "Publish review")
+}
+
 func TestPublishReviewSuccess(t *testing.T) {
 	provider := &fakeReviewProvider{info: core.ReviewProviderInfo{ID: "github", Label: "GitHub", Capabilities: core.ReviewProviderCapabilities{PublishReview: true, Decisions: []core.ReviewDecision{core.ReviewDecisionComment}}}}
 	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
