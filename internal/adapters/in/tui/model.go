@@ -201,6 +201,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.providerInfoByClient = msg.clients
 		if len(msg.errs) > 0 {
 			m.setCopyFeedback(msg.errs[0])
+			m.syncReviewViewport()
+			return m, m.expireCopyFeedbackCmd()
 		}
 		m.syncReviewViewport()
 		return m, nil

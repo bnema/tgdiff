@@ -62,6 +62,23 @@ func TestStatusBarShowsProviderPublishHint(t *testing.T) {
 	require.Contains(t, view, "P publish")
 }
 
+func TestProviderUnavailableReasonAppearsInStatusBar(t *testing.T) {
+	provider := &fakeReviewProvider{
+		info:      core.ReviewProviderInfo{ID: "pi-coding-agent", Label: "pi-coding-agent", Capabilities: core.ReviewProviderCapabilities{PublishReview: true}},
+		detection: &core.DetectionResult{Applicable: false, Reason: "no active bridge session"},
+	}
+	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, []ports.ReviewProviderClient{fakeProviderAsPort{provider}})
+
+	cmd := m.Init()
+	require.NotNil(t, cmd)
+	updated, expire := m.Update(cmd())
+	m = updated.(Model)
+
+	require.NotNil(t, expire)
+	require.Empty(t, m.providerInfos)
+	require.Contains(t, stripANSI(m.View().Content), "pi-coding-agent unavailable: no active bridge session")
+}
+
 func publishTestRange() core.ReviewLineRange {
 	return core.ReviewLineRange{Start: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, End: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}}
 }
@@ -105,6 +122,7 @@ func TestPublishReviewUnsupportedDecisionWarning(t *testing.T) {
 
 type fakeReviewProvider struct {
 	info       core.ReviewProviderInfo
+	detection  *core.DetectionResult
 	threads    []core.RemoteReviewThread
 	publishErr error
 	requests   []core.PublishReviewRequest
@@ -116,6 +134,9 @@ func (f fakeProviderAsPort) Initialize(context.Context) (core.ReviewProviderInfo
 	return f.info, nil
 }
 func (f fakeProviderAsPort) DetectContext(context.Context, core.ReviewContext) (core.DetectionResult, error) {
+	if f.detection != nil {
+		return *f.detection, nil
+	}
 	return core.DetectionResult{Applicable: true}, nil
 }
 func (f fakeProviderAsPort) LoadRemoteThreads(context.Context, core.ReviewContext) ([]core.RemoteReviewThread, error) {

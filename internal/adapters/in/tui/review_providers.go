@@ -41,6 +41,9 @@ func (m Model) loadReviewProvidersCmd() tea.Cmd {
 				continue
 			}
 			if !detection.Applicable {
+				if detection.Reason != "" {
+					errs = append(errs, fmt.Sprintf("%s unavailable: %s", providerDisplayLabel(info), detection.Reason))
+				}
 				continue
 			}
 			infos = append(infos, info)
