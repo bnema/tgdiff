@@ -5,9 +5,10 @@ import (
 	"fmt"
 
 	"ero/internal/core"
+	"ero/internal/ports"
 )
 
-func resolveStartupRequest(request core.ReviewRequest, reader startupStateReader, prompt startupPrompt, isInteractive func() bool) (core.ReviewRequest, error) {
+func resolveStartupRequest(request core.ReviewRequest, reader ports.StartupStateReader[core.StartupState], prompt startupPrompt, isInteractive func() bool) (core.ReviewRequest, error) {
 	if reader == nil {
 		return request, nil
 	}

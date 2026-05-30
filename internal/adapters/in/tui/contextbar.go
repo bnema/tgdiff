@@ -1,97 +1,40 @@
 package tui
 
 import (
-	"fmt"
-	"strings"
-
+	"ero/internal/adapters/in/tui/component"
 	"ero/internal/core"
 )
 
-type ContextBarAction string
+type ContextBarAction = component.ContextBarAction
 
 const (
-	ContextBarActionShowMore ContextBarAction = "show_more"
-	ContextBarActionShowAll  ContextBarAction = "show_all"
+	ContextBarActionShowMore = component.ContextBarActionShowMore
+	ContextBarActionShowAll  = component.ContextBarActionShowAll
 )
 
-type ContextBarPosition int
+type ContextBarPosition = component.ContextBarPosition
 
 const (
-	ContextBarBetweenChanges ContextBarPosition = iota
-	ContextBarAtFileStart
-	ContextBarAtFileEnd
-	ContextBarOnlySection
+	ContextBarBetweenChanges = component.ContextBarBetweenChanges
+	ContextBarAtFileStart    = component.ContextBarAtFileStart
+	ContextBarAtFileEnd      = component.ContextBarAtFileEnd
+	ContextBarOnlySection    = component.ContextBarOnlySection
 )
 
-type ContextBarViewModel struct {
-	HiddenLines int
-	Position    ContextBarPosition
-}
+type ContextBarViewModel = component.ContextBarViewModel
 
 func NewContextBarViewModel(file core.ReviewFile, sectionIndex int) ContextBarViewModel {
-	if sectionIndex < 0 || sectionIndex >= len(file.Sections) {
-		return ContextBarViewModel{}
-	}
-
-	position := ContextBarBetweenChanges
-	switch {
-	case len(file.Sections) == 1:
-		position = ContextBarOnlySection
-	case sectionIndex == 0:
-		position = ContextBarAtFileStart
-	case sectionIndex == len(file.Sections)-1:
-		position = ContextBarAtFileEnd
-	}
-
-	return ContextBarViewModel{
-		HiddenLines: file.Sections[sectionIndex].HiddenLineCount(),
-		Position:    position,
-	}
+	return component.NewContextBarViewModel(file, sectionIndex)
 }
 
 type ContextBar struct {
-	width int
+	bar component.ContextBar
 }
 
 func NewContextBar(width int) ContextBar {
-	return ContextBar{width: width}
+	return ContextBar{bar: component.NewContextBar(width, enterKeyLabel())}
 }
 
 func (c ContextBar) View(model ContextBarViewModel, selected bool) string {
-	label := contextBarLabel(model)
-	style := mutedStyle
-	if selected {
-		style = selectedExpander
-	}
-	return style.Inline(true).MaxWidth(c.width).Render(label)
-}
-
-func contextBarLabel(model ContextBarViewModel) string {
-	parts := []string{"⋯ " + hiddenLinesLabel(model.HiddenLines) + contextBarLocationLabel(model.Position)}
-	parts = append(parts, contextBarActionLabels()...)
-	return strings.Join(parts, " · ")
-}
-
-func contextBarLocationLabel(position ContextBarPosition) string {
-	switch position {
-	case ContextBarAtFileStart:
-		return " from beginning of file"
-	case ContextBarAtFileEnd:
-		return " to end of file"
-	case ContextBarOnlySection:
-		return " in file"
-	default:
-		return " between changes"
-	}
-}
-
-func contextBarActionLabels() []string {
-	return []string{"[" + enterKeyLabel() + "] show more", "[a] show all"}
-}
-
-func hiddenLinesLabel(hidden int) string {
-	if hidden == 1 {
-		return "1 hidden line"
-	}
-	return fmt.Sprintf("%d hidden lines", hidden)
+	return c.bar.View(model, selected)
 }

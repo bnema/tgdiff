@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"ero/internal/adapters/in/tui/render"
 	"ero/internal/core"
 )
 
@@ -239,7 +240,7 @@ func TestFormatReviewLine(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			rendered := formatReviewLine(tt.line, 4)
+			rendered := render.ReviewLine(tt.line, 4)
 			for _, expected := range tt.contains {
 				assert.Contains(t, rendered, expected)
 			}

@@ -23,10 +23,6 @@ type reviewLoader interface {
 	LoadReview(request core.ReviewRequest) ([]core.ReviewFile, error)
 }
 
-type startupStateReader interface {
-	ReadStartupState(repoPath string) (core.StartupState, error)
-}
-
 type startupPrompt interface {
 	PromptLocalChangeMode() (core.DiffMode, error)
 }
@@ -54,11 +50,11 @@ func newApp(cfg *viper.Viper, loader reviewLoader, runner tuiRunner) (*App, erro
 	return newAppWithStartup(cfg, loader, runner, nil, nil, func() bool { return false })
 }
 
-func newAppWithStartup(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, startupReader startupStateReader, prompt startupPrompt, isInteractive func() bool) (*App, error) {
+func newAppWithStartup(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, startupReader ports.StartupStateReader[core.StartupState], prompt startupPrompt, isInteractive func() bool) (*App, error) {
 	return newAppWithClipboard(cfg, loader, runner, startupReader, prompt, isInteractive, nil)
 }
 
-func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, startupReader startupStateReader, prompt startupPrompt, isInteractive func() bool, clipboardWriter ports.ClipboardWriter) (*App, error) {
+func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner, startupReader ports.StartupStateReader[core.StartupState], prompt startupPrompt, isInteractive func() bool, clipboardWriter ports.ClipboardWriter) (*App, error) {
 	if cfg == nil {
 		cfg = viper.New()
 	}

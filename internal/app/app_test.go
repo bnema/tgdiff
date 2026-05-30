@@ -2,7 +2,6 @@ package app
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"ero/internal/core"
+	"ero/internal/ports/mocks"
 )
 
 func TestNewBuildsRootCommand(t *testing.T) {
@@ -142,7 +142,8 @@ func TestRunDetectsStartupModeWhenNoExplicitCommand(t *testing.T) {
 			cfg := viper.New()
 			loader := &fakeReviewLoader{files: minimalReviewFiles()}
 			runner := &fakeRunner{}
-			stateReader := &fakeStartupStateReader{state: tt.state}
+			stateReader := mocks.NewMockStartupStateReader[core.StartupState](t)
+			stateReader.EXPECT().ReadStartupState(".").Return(tt.state, nil)
 			prompt := &fakeStartupPrompt{mode: tt.promptMode}
 			interactive := tt.wantErr == ""
 			application, err := newAppWithStartup(cfg, loader, runner, stateReader, prompt, func() bool { return interactive })
@@ -170,7 +171,7 @@ func TestRunExplicitCommandBypassesStartupDetection(t *testing.T) {
 	cfg := viper.New()
 	loader := &fakeReviewLoader{files: minimalReviewFiles()}
 	runner := &fakeRunner{}
-	stateReader := &fakeStartupStateReader{err: fmt.Errorf("should not read startup state")}
+	stateReader := mocks.NewMockStartupStateReader[core.StartupState](t)
 	application, err := newAppWithStartup(cfg, loader, runner, stateReader, &fakeStartupPrompt{}, func() bool { return true })
 	require.NoError(t, err)
 
@@ -251,15 +252,6 @@ func minimalReviewFiles() []core.ReviewFile {
 			Lines: []core.ReviewLine{{NewLineNumber: 1, Content: "package main", Kind: core.LineKindAdded}},
 		}},
 	}}
-}
-
-type fakeStartupStateReader struct {
-	state core.StartupState
-	err   error
-}
-
-func (f *fakeStartupStateReader) ReadStartupState(string) (core.StartupState, error) {
-	return f.state, f.err
 }
 
 type fakeStartupPrompt struct {

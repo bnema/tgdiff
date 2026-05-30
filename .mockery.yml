@@ -8,6 +8,6 @@ pkgname: "mocks"
 recursive: false
 template: testify
 packages:
-  tgdiff/internal/ports:
+  ero/internal/ports:
     config:
       all: true
