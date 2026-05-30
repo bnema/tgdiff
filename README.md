@@ -44,7 +44,7 @@ ero --context-lines 5
 
 ## Plugins
 
-Ero supports review provider plugins managed with `ero plugin install`, `ero plugin list`, `ero plugin update`, and `ero plugin remove`. See [docs/plugins.md](docs/plugins.md) for authoring details and the GitHub/Pimono reference examples.
+Ero supports review provider plugins managed with `ero plugin install`, `ero plugin list`, `ero plugin update`, and `ero plugin remove`. See [docs/plugins.md](docs/plugins.md) for authoring details and the GitHub/pi-coding-agent maintained plugins.
 
 ## Development
 

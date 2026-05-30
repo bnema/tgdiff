@@ -84,11 +84,11 @@ func TestPluginListHumanOutput(t *testing.T) {
 				Contributions: []string{"review_provider:github"},
 			},
 			{
-				Name:          "pimono",
+				Name:          "pi-coding-agent",
 				Version:       "0.2.0",
-				Source:        "/home/user/dev/ero-plugin-pimono",
-				Path:          "/home/user/dev/ero-plugin-pimono",
-				Contributions: []string{"review_provider:pimono"},
+				Source:        "/home/user/dev/ero-plugin-pi-coding-agent",
+				Path:          "/home/user/dev/ero-plugin-pi-coding-agent",
+				Contributions: []string{"review_provider:pi-coding-agent"},
 			},
 		},
 	}
@@ -106,7 +106,7 @@ func TestPluginListHumanOutput(t *testing.T) {
 	assert.Contains(t, output, "github v0.1.0")
 	assert.Contains(t, output, "review_provider:github")
 	assert.Contains(t, output, "git:github.com/ero-plugins/github@v0.1.0")
-	assert.Contains(t, output, "pimono v0.2.0")
+	assert.Contains(t, output, "pi-coding-agent v0.2.0")
 }
 
 func TestPluginListJSONOutput(t *testing.T) {
@@ -207,7 +207,7 @@ func TestPluginUpdateHumanOutput(t *testing.T) {
 	fake := &fakePluginManager{
 		updateResults: []pluginadapter.UpdateResult{
 			{Name: "github", PreviousRef: "abc1234def", UpdatedRef: "xyz5678abc"},
-			{Name: "pimono", Message: "pinned to v0.1.0, skipping update"},
+			{Name: "pi-coding-agent", Message: "pinned to v0.1.0, skipping update"},
 		},
 	}
 
@@ -222,7 +222,7 @@ func TestPluginUpdateHumanOutput(t *testing.T) {
 
 	output := out.String()
 	assert.Contains(t, output, "github: abc1234 → xyz5678")
-	assert.Contains(t, output, "pimono: pinned")
+	assert.Contains(t, output, "pi-coding-agent: pinned")
 }
 
 func TestPluginUpdateJSONOutput(t *testing.T) {

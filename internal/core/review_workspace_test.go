@@ -37,9 +37,9 @@ func TestReviewWorkspaceRecordsSuccessfulPublishRefs(t *testing.T) {
 func TestReviewWorkspaceRetainsFailedProviderState(t *testing.T) {
 	workspace := NewReviewWorkspace(ReviewContext{})
 	workspace.RecordPublishResult(PublishReviewResult{ProviderID: "github"})
-	workspace.RecordPublishError("pimono", errors.New("auth required"))
+	workspace.RecordPublishError("pi-coding-agent", errors.New("auth required"))
 
-	if workspace.PublishErrors["pimono"] != "auth required" {
+	if workspace.PublishErrors["pi-coding-agent"] != "auth required" {
 		t.Fatalf("unexpected errors: %#v", workspace.PublishErrors)
 	}
 	if _, ok := workspace.PublishResults["github"]; !ok {

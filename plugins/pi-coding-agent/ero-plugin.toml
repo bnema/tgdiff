@@ -1,0 +1,16 @@
+name = "ero-plugin-pi-coding-agent"
+version = "0.1.0"
+description = "Reference pi-coding-agent human-feedback destination for Ero"
+manifest_version = "1"
+protocol = "ero.plugin.v1"
+
+[runtime]
+command = "go run ./cmd/ero-plugin-pi-coding-agent"
+
+[build]
+command = "go build ./cmd/ero-plugin-pi-coding-agent"
+
+[[contributions]]
+type = "review_provider"
+id = "pi-coding-agent"
+label = "pi-coding-agent"

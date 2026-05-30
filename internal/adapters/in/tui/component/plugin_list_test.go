@@ -38,13 +38,13 @@ func TestRenderPluginListMultiple(t *testing.T) {
 
 	items := []PluginListItem{
 		{Name: "github", Version: "0.1.0", Source: "git:github.com/ero-plugins/github@v0.1.0", Contributions: []string{"review_provider:github"}},
-		{Name: "pimono", Version: "0.2.0", Source: "/local/path", Status: "active", Contributions: []string{"review_provider:pimono"}},
+		{Name: "pi-coding-agent", Version: "0.2.0", Source: "/local/path", Status: "active", Contributions: []string{"review_provider:pi-coding-agent"}},
 	}
 
 	result := RenderPluginList(items, 80)
 
 	assert.Contains(t, result, "github v0.1.0")
-	assert.Contains(t, result, "pimono v0.2.0")
+	assert.Contains(t, result, "pi-coding-agent v0.2.0")
 	assert.Contains(t, result, "active")
 
 	// Should have a newline separator between entries.

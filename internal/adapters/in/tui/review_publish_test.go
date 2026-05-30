@@ -73,7 +73,7 @@ func TestPublishReviewUsesClientMatchedByProviderID(t *testing.T) {
 }
 
 func TestPublishReviewUnsupportedDecisionWarning(t *testing.T) {
-	provider := &fakeReviewProvider{info: core.ReviewProviderInfo{ID: "pimono", Capabilities: core.ReviewProviderCapabilities{PublishReview: true, Decisions: []core.ReviewDecision{core.ReviewDecisionComment}}}}
+	provider := &fakeReviewProvider{info: core.ReviewProviderInfo{ID: "pi-coding-agent", Capabilities: core.ReviewProviderCapabilities{PublishReview: true, Decisions: []core.ReviewDecision{core.ReviewDecisionComment}}}}
 	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
 	m.reviewProviders = []ports.ReviewProviderClient{fakeProviderAsPort{provider}}
 	m.providerInfos = []core.ReviewProviderInfo{provider.info}

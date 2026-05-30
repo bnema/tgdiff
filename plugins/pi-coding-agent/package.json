@@ -1,0 +1,12 @@
+{
+  "name": "ero-plugin-pi-coding-agent",
+  "version": "0.1.0",
+  "private": true,
+  "keywords": ["pi-package", "ero-plugin"],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": ["./extension"]
+  }
+}

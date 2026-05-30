@@ -111,17 +111,27 @@ Implement `plugin.ReviewProvider` and return `plugin.NewError(...)` for structur
 
 Do not put secrets in `ero-plugin.toml`, command-line arguments, or stdout. Read credentials from environment variables or the platform credential store. Plugins should return `auth_required` when credentials are missing and should avoid logging tokens or request payloads containing secrets.
 
-## Reference examples
+## Maintained default plugins
 
-- `examples/plugins/github`: GitHub skeleton. It detects GitHub remotes, declares remote loading and publish capabilities, and requires `GITHUB_TOKEN` or `GH_TOKEN` before publish. It does not make network calls by default.
-- `examples/plugins/pimono`: Pimono destination skeleton for human feedback. It publishes only in `PIMONO_DRY_RUN=1` mode and does not load remote comments.
+Ero ships maintained plugin implementations under `plugins/`:
+
+- `plugins/github`: GitHub review provider. It detects GitHub remotes and requires `GITHUB_TOKEN` or `GH_TOKEN` before publish. It does not make network calls yet.
+- `plugins/pi-coding-agent`: pi-coding-agent destination. Load its Pi extension, then Ero can publish a review into the matching Pi session as a user message.
 
 Build them with:
 
 ```bash
-go test ./examples/plugins/...
-go build ./examples/plugins/github/cmd/ero-plugin-github ./examples/plugins/pimono/cmd/ero-plugin-pimono
+go test ./plugins/...
+go build ./plugins/github/cmd/ero-plugin-github ./plugins/pi-coding-agent/cmd/ero-plugin-pi-coding-agent
 ```
+
+For pi-coding-agent, load the bridge extension first:
+
+```bash
+pi -e ./plugins/pi-coding-agent
+```
+
+The bridge records active sessions in an owner-only runtime registry and uses per-session Unix sockets. Ero selects a session by `PI_CODING_AGENT_SESSION_ID` when set, otherwise by repository path plus branch/SHA when available.
 
 ## First-release limitations
 
