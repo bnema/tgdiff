@@ -28,6 +28,29 @@ func TestUppercasePOpensPublishOverlayWithProvider(t *testing.T) {
 	require.Contains(t, stripANSI(m.View().Content), "Publish review")
 }
 
+func TestPublishOverlaySupportsKeyboardFocusAndToggle(t *testing.T) {
+	first := core.ReviewProviderInfo{ID: "github", Label: "GitHub", Capabilities: core.ReviewProviderCapabilities{PublishReview: true}}
+	second := core.ReviewProviderInfo{ID: "pi-coding-agent", Label: "pi-coding-agent", Capabilities: core.ReviewProviderCapabilities{PublishReview: true}}
+	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
+	m.providerInfos = []core.ReviewProviderInfo{first, second}
+	m, _ = m.openPublishReview()
+
+	require.Equal(t, 0, m.publish.focused)
+	require.True(t, m.publish.selected["github"])
+
+	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	m = updated.(Model)
+	require.Equal(t, 1, m.publish.focused)
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
+	m = updated.(Model)
+	require.True(t, m.publish.selected["pi-coding-agent"])
+
+	view := stripANSI(m.View().Content)
+	require.Contains(t, view, "↑↓/j/k move")
+	require.Contains(t, view, "space toggle")
+}
+
 func TestPublishReviewSuccess(t *testing.T) {
 	provider := &fakeReviewProvider{info: core.ReviewProviderInfo{ID: "github", Label: "GitHub", Capabilities: core.ReviewProviderCapabilities{PublishReview: true, Decisions: []core.ReviewDecision{core.ReviewDecisionComment}}}}
 	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)

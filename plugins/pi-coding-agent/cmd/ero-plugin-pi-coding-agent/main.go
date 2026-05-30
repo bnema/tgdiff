@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"ero/pkg/plugin"
 )
@@ -163,6 +164,13 @@ func (p piProvider) sendToBridge(ctx context.Context, session bridgeSession, mes
 		return plugin.NewErrorf(plugin.ErrorNetwork, "connect to pi-coding-agent bridge socket: %v", err)
 	}
 	defer conn.Close()
+	deadline := time.Now().Add(10 * time.Second)
+	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
+		deadline = ctxDeadline
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		return plugin.NewErrorf(plugin.ErrorNetwork, "set pi-coding-agent bridge socket deadline: %v", err)
+	}
 	if err := json.NewEncoder(conn).Encode(bridgeReviewMessage{Token: session.Token, SessionID: session.SessionID, Message: message}); err != nil {
 		return plugin.NewErrorf(plugin.ErrorNetwork, "send review to pi-coding-agent bridge: %v", err)
 	}

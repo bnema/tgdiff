@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/bnema/zerowrap"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -17,6 +19,7 @@ import (
 	pluginadapter "ero/internal/adapters/out/plugin"
 	chromatokenizer "ero/internal/adapters/out/syntax/chroma"
 	"ero/internal/core"
+	"ero/internal/logging"
 	"ero/internal/ports"
 )
 
@@ -67,6 +70,14 @@ func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner
 	}
 
 	root, err := cli.NewRootCommand(cfg, func() error {
+		log, logPath, cleanupLogs, err := logging.Init(logging.Config{Level: cfg.GetString("log-level"), Path: cfg.GetString("log-file")})
+		if err != nil {
+			return fmt.Errorf("initialize logging: %w", err)
+		}
+		defer cleanupLogs()
+		ctx := zerowrap.WithCtx(context.Background(), log)
+		log.Info().Str("log_path", logPath).Msg("ero started")
+
 		initialRequest := core.ReviewRequest{
 			RepoPath:     cfg.GetString("repo-path"),
 			ContextLines: cfg.GetInt("context-lines"),
@@ -83,10 +94,13 @@ func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner
 			}
 			initialRequest = request
 		}
+		log.Info().Str("diff_mode", string(initialRequest.DiffMode)).Str("repo_path", initialRequest.RepoPath).Msg("loading review")
 		files, err := loader.LoadReview(initialRequest)
 		if err != nil {
+			log.Error().Err(err).Msg("load review failed")
 			return err
 		}
+		log.Info().Int("files", len(files)).Msg("review loaded")
 		var reviewProviders []ports.ReviewProviderClient
 		pluginManager := pluginadapter.NewManager()
 		if providers, err := buildReviewProviders(pluginManager); err == nil {
@@ -99,7 +113,13 @@ func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner
 			metadata = reader
 		}
 		reviewContext := buildReviewContext(initialRequest, files, metadata, version)
-		return runner.Run(tui.NewModelWithReviewProviders(files, terminal.NewCapabilities(), loader, initialRequest, clipboardWriter, reviewContext, reviewProviders))
+		err = runner.Run(tui.NewModelWithReviewProvidersContext(ctx, files, terminal.NewCapabilities(), loader, initialRequest, clipboardWriter, reviewContext, reviewProviders))
+		if err != nil {
+			log.Error().Err(err).Msg("tui exited with error")
+			return err
+		}
+		log.Info().Msg("ero exited")
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build root command: %w", err)

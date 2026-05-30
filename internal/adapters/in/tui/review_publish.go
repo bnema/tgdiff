@@ -7,6 +7,11 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+
+	"github.com/bnema/zerowrap"
+
+	"ero/internal/adapters/in/tui/theme"
 
 	"ero/internal/core"
 )
@@ -14,6 +19,7 @@ import (
 type publishState struct {
 	active                 bool
 	selected               map[string]bool
+	focused                int
 	publishing             bool
 	message                string
 	unsupportedDecision    map[string]core.ReviewDecision
@@ -26,7 +32,9 @@ type publishReviewCompletedMsg struct {
 }
 
 func (m Model) openPublishReview() (Model, tea.Cmd) {
+	log := zerowrap.FromCtx(m.ctx)
 	if len(m.providerInfos) == 0 {
+		log.Warn().Msg("publish requested with no review providers available")
 		m.setCopyFeedback("No review providers available")
 		return m, nil
 	}
@@ -36,12 +44,14 @@ func (m Model) openPublishReview() (Model, tea.Cmd) {
 			selected[info.ID] = true
 		}
 	}
+	log.Info().Int("provider_count", len(m.providerInfos)).Msg("publish overlay opened")
 	m.publish = publishState{
 		active:                 true,
 		selected:               selected,
+		focused:                firstPublishableProviderIndex(m.providerInfos),
 		unsupportedDecision:    map[string]core.ReviewDecision{},
 		confirmWithoutDecision: map[string]bool{},
-		message:                "Select provider and press enter to publish",
+		message:                "Select destinations, then press enter to publish.",
 	}
 	return m, nil
 }
@@ -51,16 +61,22 @@ func (m Model) updatePublishReview(msg tea.KeyPressMsg) (Model, tea.Cmd) {
 	case "esc", "q":
 		m.publish = publishState{}
 		return m, nil
+	case "up", "k":
+		m.movePublishFocus(-1)
+		return m, nil
+	case "down", "j":
+		m.movePublishFocus(1)
+		return m, nil
+	case "space":
+		m.toggleFocusedPublishProvider()
+		return m, nil
 	case "enter":
 		return m.publishSelectedProviders()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		idx := int(msg.String()[0] - '1')
 		if idx >= 0 && idx < len(m.providerInfos) {
-			id := m.providerInfos[idx].ID
-			if m.publish.selected == nil {
-				m.publish.selected = map[string]bool{}
-			}
-			m.publish.selected[id] = !m.publish.selected[id]
+			m.publish.focused = idx
+			m.togglePublishProvider(idx)
 		}
 	}
 	return m, nil
@@ -74,7 +90,9 @@ func (m Model) publishSelectedProviders() (Model, tea.Cmd) {
 		m.reviewDraft = core.NewReviewDraft()
 	}
 	selectedInfos := m.selectedPublishProviderInfos()
+	log := zerowrap.FromCtx(m.ctx)
 	if len(selectedInfos) == 0 {
+		log.Warn().Msg("publish attempted with no selected providers")
 		m.publish.message = "Select at least one provider"
 		return m, nil
 	}
@@ -82,6 +100,7 @@ func (m Model) publishSelectedProviders() (Model, tea.Cmd) {
 	m.publish.unsupportedDecision = map[string]core.ReviewDecision{}
 	for _, info := range selectedInfos {
 		if !info.Capabilities.PublishReview {
+			log.Warn().Str("provider_id", info.ID).Msg("publish attempted for provider without publish capability")
 			m.publish.message = fmt.Sprintf("%s does not support publishing", providerDisplayLabel(info))
 			return m, nil
 		}
@@ -90,6 +109,7 @@ func (m Model) publishSelectedProviders() (Model, tea.Cmd) {
 		}
 	}
 	if len(m.publish.unsupportedDecision) > 0 {
+		log.Warn().Str("decision", string(decision)).Any("provider_ids", mapKeys(m.publish.unsupportedDecision)).Msg("publish decision unsupported by selected providers")
 		m.publish.message = "Decision unsupported by selected provider; press enter again to publish without decision"
 		if m.publish.confirmWithoutDecision == nil {
 			m.publish.confirmWithoutDecision = map[string]bool{}
@@ -101,12 +121,19 @@ func (m Model) publishSelectedProviders() (Model, tea.Cmd) {
 	}
 	providers := append([]core.ReviewProviderInfo(nil), selectedInfos...)
 	clients := append([]providerClientWithInfo(nil), m.providerClientsFor(providers)...)
-	ctx := m.reviewContext
+	reviewCtx := m.reviewContext
+	cmdCtx := m.ctx
 	draft := m.reviewDraft.Snapshot()
 	confirmWithoutDecision := copyBoolMap(m.publish.confirmWithoutDecision)
 	m.publish.publishing = true
 	m.publish.message = "Publishing review…"
+	providerIDs := make([]string, 0, len(providers))
+	for _, info := range providers {
+		providerIDs = append(providerIDs, info.ID)
+	}
+	log.Info().Any("provider_ids", providerIDs).Int("comment_count", len(draft.Comments)).Str("decision", string(draft.Decision)).Msg("publishing review")
 	return m, func() tea.Msg {
+		cmdLog := zerowrap.FromCtx(cmdCtx)
 		results := make([]core.PublishReviewResult, 0, len(clients))
 		errs := map[string]error{}
 		for _, item := range clients {
@@ -114,11 +141,13 @@ func (m Model) publishSelectedProviders() (Model, tea.Cmd) {
 			if confirmWithoutDecision[item.info.ID] {
 				payload.Decision = ""
 			}
-			result, err := item.client.PublishReview(context.Background(), core.PublishReviewRequest{ProviderID: item.info.ID, Context: ctx, Draft: payload})
+			result, err := item.client.PublishReview(cmdCtx, core.PublishReviewRequest{ProviderID: item.info.ID, Context: reviewCtx, Draft: payload})
 			if err != nil {
+				cmdLog.Error().Err(err).Str("provider_id", item.info.ID).Msg("publish provider failed")
 				errs[item.info.ID] = err
 				continue
 			}
+			cmdLog.Info().Str("provider_id", item.info.ID).Str("external_review_id", result.ExternalReviewID).Bool("ambiguous", result.Ambiguous).Msg("publish provider succeeded")
 			results = append(results, result)
 		}
 		return publishReviewCompletedMsg{results: results, errors: errs}
@@ -131,6 +160,7 @@ func (m Model) handlePublishReviewCompleted(msg publishReviewCompletedMsg) (Mode
 		m.applyPublishedRefs(msg.results)
 	}
 	ambiguous := ambiguousProviderIDs(msg.results)
+	log := zerowrap.FromCtx(m.ctx)
 	if len(msg.errors) > 0 || len(ambiguous) > 0 {
 		parts := make([]string, 0, len(msg.errors)+len(ambiguous)+1)
 		if len(msg.results) > 0 {
@@ -142,11 +172,13 @@ func (m Model) handlePublishReviewCompleted(msg publishReviewCompletedMsg) (Mode
 		if len(ambiguous) > 0 {
 			parts = append(parts, "ambiguous: "+strings.Join(ambiguous, ", "))
 		}
+		log.Warn().Int("result_count", len(msg.results)).Int("error_count", len(msg.errors)).Any("ambiguous_provider_ids", ambiguous).Msg("publish completed with errors")
 		m.publish.message = "Partial publish: " + strings.Join(parts, "; ")
 		m.setCopyFeedback(m.publish.message)
 		m.syncReviewViewport()
 		return m, m.expireCopyFeedbackCmd()
 	}
+	log.Info().Int("result_count", len(msg.results)).Msg("publish completed successfully")
 	m.publish = publishState{}
 	m.setCopyFeedback(fmt.Sprintf("Published review to %d %s", len(msg.results), pluralize("provider", len(msg.results))))
 	m.syncReviewViewport()
@@ -161,6 +193,37 @@ func ambiguousProviderIDs(results []core.PublishReviewResult) []string {
 		}
 	}
 	return ids
+}
+
+func (m *Model) movePublishFocus(delta int) {
+	if len(m.providerInfos) == 0 || delta == 0 || m.publish.publishing {
+		return
+	}
+	m.publish.focused = (m.publish.focused + delta + len(m.providerInfos)) % len(m.providerInfos)
+}
+
+func (m *Model) toggleFocusedPublishProvider() {
+	m.togglePublishProvider(m.publish.focused)
+}
+
+func (m *Model) togglePublishProvider(idx int) {
+	if m.publish.publishing || idx < 0 || idx >= len(m.providerInfos) {
+		return
+	}
+	if m.publish.selected == nil {
+		m.publish.selected = map[string]bool{}
+	}
+	id := m.providerInfos[idx].ID
+	m.publish.selected[id] = !m.publish.selected[id]
+}
+
+func firstPublishableProviderIndex(infos []core.ReviewProviderInfo) int {
+	for i, info := range infos {
+		if info.Capabilities.PublishReview {
+			return i
+		}
+	}
+	return 0
 }
 
 func (m Model) selectedPublishProviderInfos() []core.ReviewProviderInfo {
@@ -219,30 +282,81 @@ func copyBoolMap(input map[string]bool) map[string]bool {
 	return out
 }
 
-func (m Model) renderPublishOverlay(content string) string {
-	var b strings.Builder
-	b.WriteString(content)
-	b.WriteString("\n\nPublish review\n")
-	if m.publish.message != "" {
-		b.WriteString(m.publish.message)
-		b.WriteString("\n")
+func mapKeys[K comparable, V any](input map[K]V) []K {
+	keys := make([]K, 0, len(input))
+	for key := range input {
+		keys = append(keys, key)
 	}
-	if m.publish.publishing {
-		b.WriteString("Publishing…\n")
+	return keys
+}
+
+func (m Model) renderPublishOverlay(content string) string {
+	width := max(m.width, 1)
+	height := max(m.height, 1)
+	pane := m.renderPublishPane(width)
+	return renderCenteredOverlay(content, pane, width, height, max((height-lipgloss.Height(pane))/2, 0))
+}
+
+func (m Model) renderPublishPane(width int) string {
+	var b strings.Builder
+	b.WriteString("Publish review\n")
+	if m.publish.message != "" {
+		b.WriteString(theme.HelpLabelStyle.Render(m.publish.message))
+		b.WriteString("\n\n")
 	}
 	for i, info := range m.providerInfos {
-		mark := " "
-		if m.publish.selected[info.ID] {
-			mark = "x"
-		}
-		fmt.Fprintf(&b, "%d. [%s] %s", i+1, mark, providerDisplayLabel(info))
-		if decision, ok := m.publish.unsupportedDecision[info.ID]; ok {
-			fmt.Fprintf(&b, " (does not support %s)", decision)
-		}
+		b.WriteString(m.renderPublishProviderRow(i, info, width))
 		b.WriteString("\n")
 	}
-	b.WriteString("Enter publish · 1-9 toggle · Esc cancel")
-	return b.String()
+	b.WriteString("\n")
+	if m.publish.publishing {
+		b.WriteString(theme.StatusInfoStyle.Render("Publishing… waiting for provider response"))
+		b.WriteString("\n")
+	}
+	b.WriteString(theme.MutedStyle.Render("↑↓/j/k move · space toggle · enter publish · esc cancel"))
+	return theme.SearchPaneStyle.Width(min(max(width-8, 32), 76)).Render(b.String())
+}
+
+func (m Model) renderPublishProviderRow(index int, info core.ReviewProviderInfo, width int) string {
+	selected := m.publish.selected[info.ID]
+	focused := index == m.publish.focused
+	mark := "○"
+	if selected {
+		mark = "●"
+	}
+	label := providerDisplayLabel(info)
+	capability := "publish"
+	if !info.Capabilities.PublishReview {
+		capability = "read-only"
+	}
+	row := fmt.Sprintf("%d  %s  %s", index+1, mark, label)
+	if decision, ok := m.publish.unsupportedDecision[info.ID]; ok {
+		row += fmt.Sprintf("  %s", theme.MutedStyle.Render("does not support "+string(decision)))
+	} else {
+		row += "  " + theme.MutedStyle.Render(capability)
+	}
+	row = truncatePublishRow(row, min(max(width-12, 24), 72))
+	if focused {
+		return theme.SearchSelectedRowStyle.Width(min(max(width-12, 24), 72)).Render(row)
+	}
+	if selected {
+		return theme.HelpLabelStyle.Render(row)
+	}
+	return theme.MutedStyle.Render(row)
+}
+
+func truncatePublishRow(row string, width int) string {
+	if lipgloss.Width(row) <= width {
+		return row
+	}
+	runes := []rune(row)
+	if width <= 1 {
+		return "…"
+	}
+	if len(runes) > width-1 {
+		return string(runes[:width-1]) + "…"
+	}
+	return row
 }
 
 func providerDisplayLabel(info core.ReviewProviderInfo) string {

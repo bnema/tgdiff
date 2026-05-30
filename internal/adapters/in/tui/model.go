@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
 	viewport "charm.land/bubbles/v2/viewport"
@@ -89,6 +90,7 @@ type Model struct {
 	providerInfos        []core.ReviewProviderInfo
 	providerInfoByClient map[ports.ReviewProviderClient]core.ReviewProviderInfo
 	publish              publishState
+	ctx                  context.Context
 }
 
 func NewModel(files []core.ReviewFile) Model {
@@ -108,6 +110,13 @@ func NewModelWithClipboardWriter(files []core.ReviewFile, terminal ports.Termina
 }
 
 func NewModelWithReviewProviders(files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest, clipboardWriter ports.ClipboardWriter, reviewContext core.ReviewContext, providers []ports.ReviewProviderClient) Model {
+	return NewModelWithReviewProvidersContext(context.Background(), files, terminal, loader, request, clipboardWriter, reviewContext, providers)
+}
+
+func NewModelWithReviewProvidersContext(ctx context.Context, files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest, clipboardWriter ports.ClipboardWriter, reviewContext core.ReviewContext, providers []ports.ReviewProviderClient) Model {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if request.DiffMode == "" {
 		request.DiffMode = core.DiffModeBranch
 	}
@@ -130,6 +139,7 @@ func NewModelWithReviewProviders(files []core.ReviewFile, terminal ports.Termina
 		providerInfos:        nil,
 		providerInfoByClient: map[ports.ReviewProviderClient]core.ReviewProviderInfo{},
 		remoteThreads:        nil,
+		ctx:                  ctx,
 	}
 	if terminal != nil {
 		m.nerdFont = terminal.SupportsNerdFont()
