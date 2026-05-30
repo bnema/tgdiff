@@ -174,6 +174,11 @@ func (p piProvider) sendToBridge(ctx context.Context, session bridgeSession, mes
 	if err := json.NewEncoder(conn).Encode(bridgeReviewMessage{Token: session.Token, SessionID: session.SessionID, Message: message}); err != nil {
 		return plugin.NewErrorf(plugin.ErrorNetwork, "send review to pi-coding-agent bridge: %v", err)
 	}
+	if unixConn, ok := conn.(*net.UnixConn); ok {
+		if err := unixConn.CloseWrite(); err != nil {
+			return plugin.NewErrorf(plugin.ErrorNetwork, "finish pi-coding-agent bridge request: %v", err)
+		}
+	}
 	var response bridgeResponse
 	if err := json.NewDecoder(conn).Decode(&response); err != nil {
 		return plugin.NewErrorf(plugin.ErrorNetwork, "read pi-coding-agent bridge response: %v", err)
