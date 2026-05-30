@@ -14,6 +14,7 @@ type StatusModel struct {
 	AppName       string
 	Mode          string
 	FileCount     int
+	ProviderCount int
 	CurrentFile   string
 	Message       string
 	ScrollPercent float64
@@ -29,14 +30,18 @@ func NewStatusBar(width int) StatusBar {
 
 func (c StatusBar) Render(model StatusModel) string {
 	width := max(c.width, 1)
-	right := renderStatusHint(width)
+	right := renderStatusHint(width, model.ProviderCount)
 	leftWidth := max(width-lipgloss.Width(right)-1, 0)
 
-	prefix := renderStatusSegments(leftWidth,
-		statusSegment{style: theme.StatusAppStyle, label: model.AppName},
-		statusSegment{style: theme.StatusModeStyle, label: model.Mode},
-		statusSegment{style: theme.StatusInfoStyle, label: fileCountLabel(model.FileCount)},
-	)
+	segments := []statusSegment{
+		{style: theme.StatusAppStyle, label: model.AppName},
+		{style: theme.StatusModeStyle, label: model.Mode},
+		{style: theme.StatusInfoStyle, label: fileCountLabel(model.FileCount)},
+	}
+	if model.ProviderCount > 0 {
+		segments = append(segments, statusSegment{style: theme.StatusInfoStyle, label: providerCountLabel(model.ProviderCount)})
+	}
+	prefix := renderStatusSegments(leftWidth, segments...)
 	percent := renderStatusSegments(leftWidth-lipgloss.Width(prefix), statusSegment{style: theme.StatusInfoStyle, label: fmt.Sprintf("%3.0f%%", model.ScrollPercent*100)})
 
 	middleLabel := model.CurrentFile
@@ -64,14 +69,20 @@ type KeyHint struct {
 	Label string
 }
 
-func renderStatusHint(width int) string {
-	hint := KeyHint{Key: "?", Label: "help"}
-	label := hint.Key + " " + hint.Label
-	full := RenderKeyHints([]KeyHint{hint})
+func renderStatusHint(width, providerCount int) string {
+	hints := []KeyHint{{Key: "?", Label: "help"}}
+	if providerCount > 0 {
+		hints = []KeyHint{{Key: "P", Label: "publish"}, {Key: "?", Label: "help"}}
+	}
+	full := RenderKeyHints(hints)
 	if lipgloss.Width(full) <= width {
 		return full
 	}
-	return theme.StatusInfoStyle.Render(TruncateRunes(label, max(width-theme.StatusInfoStyle.GetHorizontalPadding(), 0)))
+	fallback := "? help"
+	if providerCount > 0 {
+		fallback = "P publish"
+	}
+	return theme.StatusInfoStyle.Render(TruncateRunes(fallback, max(width-theme.StatusInfoStyle.GetHorizontalPadding(), 0)))
 }
 
 func renderStatusSegments(width int, segments ...statusSegment) string {
@@ -105,6 +116,13 @@ func fileCountLabel(count int) string {
 		return "1 file"
 	}
 	return fmt.Sprintf("%d files", count)
+}
+
+func providerCountLabel(count int) string {
+	if count == 1 {
+		return "1 provider"
+	}
+	return fmt.Sprintf("%d providers", count)
 }
 
 func TruncateRunes(value string, width int) string {

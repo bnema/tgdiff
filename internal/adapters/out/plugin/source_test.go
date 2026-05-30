@@ -1,6 +1,7 @@
 package pluginadapter
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -148,13 +149,25 @@ func TestParseSourceLocal(t *testing.T) {
 		assert.Equal(t, dir, source.LocalPath)
 	})
 
-	t.Run("non-git directory fails", func(t *testing.T) {
+	t.Run("local plugin directory without git works", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		err := os.WriteFile(filepath.Join(dir, "ero-plugin.toml"), []byte("name = \"local\"\n"), 0o644)
+		require.NoError(t, err)
+		source, err := ParseSource(dir)
+		require.NoError(t, err)
+		assert.Equal(t, SourceTypeLocal, source.Type)
+		assert.Equal(t, dir, source.LocalPath)
+	})
+
+	t.Run("directory without manifest or git fails", func(t *testing.T) {
 		t.Parallel()
 
 		dir := t.TempDir()
 		_, err := ParseSource(dir)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not a git repository")
+		assert.Contains(t, err.Error(), "missing ero-plugin.toml")
 	})
 
 	t.Run("worktree gitfile works", func(t *testing.T) {

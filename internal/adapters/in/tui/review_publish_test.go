@@ -52,6 +52,16 @@ func TestPublishReviewFailedProvider(t *testing.T) {
 	require.Contains(t, m.publish.message, "auth required")
 }
 
+func TestStatusBarShowsProviderPublishHint(t *testing.T) {
+	provider := &fakeReviewProvider{info: core.ReviewProviderInfo{ID: "pi-coding-agent", Label: "pi-coding-agent", Capabilities: core.ReviewProviderCapabilities{PublishReview: true}}}
+	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
+	m.providerInfos = []core.ReviewProviderInfo{provider.info}
+
+	view := stripANSI(m.View().Content)
+	require.Contains(t, view, "1 provider")
+	require.Contains(t, view, "P publish")
+}
+
 func publishTestRange() core.ReviewLineRange {
 	return core.ReviewLineRange{Start: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, End: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}}
 }

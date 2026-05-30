@@ -50,27 +50,24 @@ func ParseSource(raw string) (Source, error) {
 	return ParseLocalSource(raw)
 }
 
-// ParseLocalSource validates that path points to a git repository directory
-// (contains .git as a directory or a gitfile).
+// ParseLocalSource validates that path points to a local plugin directory. The
+// directory may be a Git repository root, a Git worktree, or a plugin
+// subdirectory inside a larger repository, as long as it contains
+// ero-plugin.toml.
 func ParseLocalSource(path string) (Source, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return Source{}, fmt.Errorf("plugin source %q: %w", path, err)
 	}
-
-	gitPath := filepath.Join(abs, ".git")
-	info, err := os.Stat(gitPath)
+	info, err := os.Stat(abs)
 	if err != nil {
-		return Source{}, fmt.Errorf("plugin source %q is not a git repository: %w", path, err)
+		return Source{}, fmt.Errorf("plugin source %q: %w", path, err)
 	}
-
-	// .git can be a directory (normal clone) or a file (worktree / submodule).
 	if !info.IsDir() {
-		// Check it's a valid gitfile.
-		data, err := os.ReadFile(gitPath)
-		if err != nil || !strings.HasPrefix(strings.TrimSpace(string(data)), "gitdir:") {
-			return Source{}, fmt.Errorf("plugin source %q: .git is not a directory or valid gitfile", path)
-		}
+		return Source{}, fmt.Errorf("plugin source %q is not a directory", path)
+	}
+	if err := validateLocalPluginPath(abs); err != nil {
+		return Source{}, fmt.Errorf("plugin source %q: %w", path, err)
 	}
 
 	base := filepath.Base(abs)
@@ -82,6 +79,26 @@ func ParseLocalSource(path string) (Source, error) {
 		Path:      base,
 		LocalPath: abs,
 	}, nil
+}
+
+func validateLocalPluginPath(abs string) error {
+	if _, err := os.Stat(filepath.Join(abs, "ero-plugin.toml")); err == nil {
+		return nil
+	}
+
+	gitPath := filepath.Join(abs, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return fmt.Errorf("missing ero-plugin.toml")
+	}
+	if info.IsDir() {
+		return nil
+	}
+	data, err := os.ReadFile(gitPath)
+	if err != nil || !strings.HasPrefix(strings.TrimSpace(string(data)), "gitdir:") {
+		return fmt.Errorf(".git is not a directory or valid gitfile")
+	}
+	return nil
 }
 
 // parseGitShorthand handles "git:github.com/owner/repo@ref".

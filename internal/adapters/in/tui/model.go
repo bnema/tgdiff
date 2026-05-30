@@ -312,6 +312,7 @@ func (m Model) View() tea.View {
 			AppName:       m.title,
 			Mode:          diffModeLabel(m.diffMode, m.nerdFont),
 			FileCount:     len(m.files),
+			ProviderCount: len(m.providerInfos),
 			CurrentFile:   m.activeLocation(),
 			Message:       m.copyFeedback,
 			ScrollPercent: m.reviewViewport.ScrollPercent(),
