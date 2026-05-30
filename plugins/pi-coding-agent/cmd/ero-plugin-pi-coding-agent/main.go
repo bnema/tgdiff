@@ -215,10 +215,7 @@ func scoreBridgeSession(session bridgeSession, candidates []string, repo plugin.
 		}
 		score += 4
 	}
-	if repo.HeadSHA != "" && session.HeadSHA != "" {
-		if repo.HeadSHA != session.HeadSHA {
-			return -1
-		}
+	if repo.HeadSHA != "" && session.HeadSHA != "" && repo.HeadSHA == session.HeadSHA {
 		score += 8
 	}
 	return score

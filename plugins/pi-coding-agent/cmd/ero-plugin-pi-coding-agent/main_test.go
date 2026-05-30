@@ -109,6 +109,16 @@ func TestSelectBridgeSessionPrefersMostSpecificMatch(t *testing.T) {
 	}
 }
 
+func TestSelectBridgeSessionAcceptsSameBranchWithDifferentHead(t *testing.T) {
+	root := mustAbs(t, ".")
+	session, ok := selectBridgeSession([]bridgeSession{
+		{SessionID: "same-branch", WorktreeRoot: root, CurrentBranch: "feature", HeadSHA: "old"},
+	}, plugin.RepositoryMetadata{WorktreeRoot: root, CurrentBranch: "feature", HeadSHA: "new"}, "")
+	if !ok || session.SessionID != "same-branch" {
+		t.Fatalf("expected same branch session, got %#v ok=%v", session, ok)
+	}
+}
+
 func writeBridgeState(t *testing.T, state bridgeState) string {
 	t.Helper()
 	return writeBridgeStateAt(t, filepath.Join(secureTempDir(t), bridgeStateFile), state)
