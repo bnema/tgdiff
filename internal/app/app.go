@@ -14,6 +14,7 @@ import (
 	"ero/internal/adapters/in/tui"
 	clipboardadapter "ero/internal/adapters/out/clipboard"
 	gitadapter "ero/internal/adapters/out/git"
+	pluginadapter "ero/internal/adapters/out/plugin"
 	chromatokenizer "ero/internal/adapters/out/syntax/chroma"
 	"ero/internal/core"
 	"ero/internal/ports"
@@ -86,12 +87,25 @@ func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner
 		if err != nil {
 			return err
 		}
-		return runner.Run(tui.NewModelWithClipboardWriter(files, terminal.NewCapabilities(), loader, initialRequest, clipboardWriter))
+		var reviewProviders []ports.ReviewProviderClient
+		pluginManager := pluginadapter.NewManager()
+		if providers, err := buildReviewProviders(pluginManager); err == nil {
+			reviewProviders = providers
+		}
+		var metadata ports.GitMetadataReader
+		if reader, ok := loader.(ports.GitMetadataReader); ok {
+			metadata = reader
+		} else if reader, ok := startupReader.(ports.GitMetadataReader); ok {
+			metadata = reader
+		}
+		reviewContext := buildReviewContext(initialRequest, files, metadata, version)
+		return runner.Run(tui.NewModelWithReviewProviders(files, terminal.NewCapabilities(), loader, initialRequest, clipboardWriter, reviewContext, reviewProviders))
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build root command: %w", err)
 	}
 	root.AddCommand(versionCommand())
+	root.AddCommand(cli.NewPluginCommand(pluginadapter.NewManager(), nil))
 
 	return &App{
 		config: cfg,

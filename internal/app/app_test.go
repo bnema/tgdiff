@@ -2,6 +2,9 @@ package app
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"os"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"ero/internal/core"
+	"ero/internal/ports"
 	"ero/internal/ports/mocks"
 )
 
@@ -243,6 +247,91 @@ func TestRunLoadsReviewAndRunsTUIWithConfig(t *testing.T) {
 	}
 }
 
+func TestBuildReviewProvidersStartsOneClientPerReviewProviderContribution(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	err := os.WriteFile(dir+"/ero-plugin.toml", []byte(`name = "multi"
+version = "0.1.0"
+manifest_version = "1"
+protocol = "ero.plugin.v1"
+
+[runtime]
+command = "cat"
+
+[[contributions]]
+type = "review_provider"
+id = "github"
+label = "GitHub"
+
+[[contributions]]
+type = "review_provider"
+id = "gitlab"
+label = "GitLab"
+`), 0o644)
+	require.NoError(t, err)
+
+	providers, err := buildReviewProviders(fakePluginRegistry{descriptors: []ports.PluginDescriptor{{
+		Name: "multi",
+		Path: dir,
+		Contributions: []ports.PluginContribution{
+			{Type: "review_provider", ID: "github", Label: "GitHub"},
+			{Type: "review_provider", ID: "gitlab", Label: "GitLab"},
+			{Type: "other", ID: "ignored", Label: "Ignored"},
+		},
+	}}})
+	require.NoError(t, err)
+	require.Len(t, providers, 2)
+	for _, provider := range providers {
+		require.NoError(t, provider.Close())
+	}
+}
+
+func TestBuildReviewContext(t *testing.T) {
+	metadata := &fakeGitMetadataReader{
+		worktreeRoot:  "/repo",
+		currentBranch: "feature",
+		defaultBranch: "main",
+		headSHA:       "headsha",
+		remotes:       []ports.GitRemoteInfo{{Name: "origin", URL: "git@example.com:repo.git"}},
+	}
+	ctx := buildReviewContext(core.ReviewRequest{RepoPath: "/repo", DiffMode: core.DiffModeRange, BaseRevision: "main", HeadRevision: "feature"}, []core.ReviewFile{{
+		Path:    "demo.go",
+		OldPath: "old_demo.go",
+		Status:  core.ReviewFileStatusRenamed,
+		Sections: []core.ReviewSection{{ID: "hunk-1", Kind: core.SectionKindChanged, Lines: []core.ReviewLine{
+			{OldLineNumber: 1, NewLineNumber: 1, Kind: core.LineKindUnchanged},
+			{NewLineNumber: 2, Kind: core.LineKindAdded},
+			{OldLineNumber: 3, Kind: core.LineKindDeleted},
+		}}},
+	}}, metadata, "test-version")
+
+	require.Equal(t, "/repo", ctx.Repository.RepoPath)
+	require.Equal(t, "/repo", ctx.Repository.WorktreeRoot)
+	require.Equal(t, "feature", ctx.Repository.CurrentBranch)
+	require.Equal(t, "main", ctx.Repository.DefaultBranch)
+	require.Equal(t, "test-version", ctx.Session.EroVersion)
+	require.NotEmpty(t, ctx.Session.LocalReviewID)
+	require.Equal(t, 1, ctx.Diff.FilesChanged)
+	require.Equal(t, 1, ctx.Diff.Additions)
+	require.Equal(t, 1, ctx.Diff.Deletions)
+	require.Len(t, ctx.Files, 1)
+	require.Equal(t, core.ReviewFileStatusRenamed, ctx.Files[0].Status)
+	require.Equal(t, "old_demo.go", ctx.Files[0].OldPath)
+	require.Len(t, ctx.Files[0].LineAnchors, 3)
+	require.Equal(t, core.ReviewLineSideOld, ctx.Files[0].LineAnchors[2].Side)
+	require.Len(t, ctx.Files[0].Hunks, 1)
+	require.Equal(t, 1, ctx.Files[0].Hunks[0].OldStartLine)
+	require.Equal(t, 1, ctx.Files[0].Hunks[0].NewStartLine)
+}
+
+func TestBuildReviewContextMetadataBestEffort(t *testing.T) {
+	ctx := buildReviewContext(core.ReviewRequest{RepoPath: "/repo", DiffMode: core.DiffModeBranch}, minimalReviewFiles(), &fakeGitMetadataReader{err: errors.New("git unavailable")}, "dev")
+	require.Equal(t, "/repo", ctx.Repository.RepoPath)
+	require.Empty(t, ctx.Repository.WorktreeRoot)
+	require.NotEmpty(t, ctx.Session.IdempotencyKey)
+}
+
 func minimalReviewFiles() []core.ReviewFile {
 	return []core.ReviewFile{{
 		Path: "demo.go",
@@ -253,6 +342,38 @@ func minimalReviewFiles() []core.ReviewFile {
 		}},
 	}}
 }
+
+type fakePluginRegistry struct {
+	descriptors []ports.PluginDescriptor
+	err         error
+}
+
+func (f fakePluginRegistry) InstalledPlugins(context.Context) ([]ports.PluginDescriptor, error) {
+	return f.descriptors, f.err
+}
+
+type fakeGitMetadataReader struct {
+	worktreeRoot  string
+	currentBranch string
+	defaultBranch string
+	headSHA       string
+	remotes       []ports.GitRemoteInfo
+	err           error
+}
+
+func (f *fakeGitMetadataReader) WorktreeRoot(string) (string, error)  { return f.worktreeRoot, f.err }
+func (f *fakeGitMetadataReader) CurrentBranch(string) (string, error) { return f.currentBranch, f.err }
+func (f *fakeGitMetadataReader) HeadSHA(string) (string, error)       { return f.headSHA, f.err }
+func (f *fakeGitMetadataReader) Remotes(string) ([]ports.GitRemoteInfo, error) {
+	return f.remotes, f.err
+}
+func (f *fakeGitMetadataReader) MergeBase(string, string, string) (string, error) {
+	return "mergebase", f.err
+}
+func (f *fakeGitMetadataReader) ResolveRevision(_ string, revision string) (string, error) {
+	return revision + "sha", f.err
+}
+func (f *fakeGitMetadataReader) DefaultBranch(string) (string, error) { return f.defaultBranch, f.err }
 
 type fakeStartupPrompt struct {
 	mode core.DiffMode

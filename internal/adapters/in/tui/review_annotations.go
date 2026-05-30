@@ -18,8 +18,9 @@ var (
 )
 
 type ReviewAnnotations struct {
-	Comments []core.ReviewComment
-	Editor   *InlineCommentEditor
+	Comments      []core.ReviewComment
+	RemoteThreads []core.RemoteReviewThread
+	Editor        *InlineCommentEditor
 }
 
 type InlineCommentEditor struct {
@@ -30,13 +31,21 @@ type InlineCommentEditor struct {
 
 func (c ReviewDocument) RenderWithAnnotations(files []core.ReviewFile, selectedFile, selectedContext int, annotations ReviewAnnotations) ReviewDocumentRender {
 	rendered := c.RenderWithAnchors(files, selectedFile, selectedContext)
-	if len(annotations.Comments) == 0 && annotations.Editor == nil {
+	if len(annotations.Comments) == 0 && len(annotations.RemoteThreads) == 0 && annotations.Editor == nil {
 		return rendered
 	}
 
 	lineIndents := reviewLineContentIndents(files)
 	lines := make([]string, 0, len(rendered.Lines)+len(annotations.Comments)*2+4)
 	rows := make([]ReviewRow, 0, len(rendered.Rows)+len(annotations.Comments)*2+4)
+	for _, thread := range annotations.RemoteThreads {
+		if thread.Unmapped || thread.FilePath == "" {
+			for _, line := range renderUnmappedRemoteThread(thread) {
+				lines = append(lines, line)
+				rows = append(rows, ReviewRow{Kind: ReviewRowKindMessage, Text: line})
+			}
+		}
+	}
 	for index, row := range rendered.Rows {
 		lines = append(lines, rendered.Lines[index])
 		rows = append(rows, row)
@@ -44,6 +53,14 @@ func (c ReviewDocument) RenderWithAnnotations(files []core.ReviewFile, selectedF
 		for _, comment := range annotations.Comments {
 			if commentBelongsAfterRow(comment, row) {
 				for _, commentLine := range renderInlineComment(comment, indent) {
+					lines = append(lines, commentLine)
+					rows = append(rows, ReviewRow{Kind: ReviewRowKindMessage, FileIndex: row.FileIndex, SectionIndex: row.SectionIndex, FilePath: row.FilePath, Text: commentLine})
+				}
+			}
+		}
+		for _, thread := range annotations.RemoteThreads {
+			if remoteThreadBelongsAfterRow(thread, row) {
+				for _, commentLine := range renderRemoteThread(thread, indent) {
 					lines = append(lines, commentLine)
 					rows = append(rows, ReviewRow{Kind: ReviewRowKindMessage, FileIndex: row.FileIndex, SectionIndex: row.SectionIndex, FilePath: row.FilePath, Text: commentLine})
 				}
@@ -119,6 +136,13 @@ func inlineAnnotationIndent(row ReviewRow, lineIndents map[int]string) string {
 	return lineIndents[row.FileIndex]
 }
 
+func remoteThreadBelongsAfterRow(thread core.RemoteReviewThread, row ReviewRow) bool {
+	if thread.Unmapped || row.Kind != ReviewRowKindLine || row.FilePath != thread.FilePath {
+		return false
+	}
+	return reviewLineMatchesRef(row.Line, thread.Range.End)
+}
+
 func renderInlineComment(comment core.ReviewComment, indent string) []string {
 	bodyLines := strings.Split(comment.Body, "\n")
 	lines := make([]string, 0, len(bodyLines)+1)
@@ -128,6 +152,39 @@ func renderInlineComment(comment core.ReviewComment, indent string) []string {
 		lines = append(lines, indent+inlineCommentStyle.Render(inlineCommentBodyStyle.Render(bodyLine)))
 	}
 	return lines
+}
+
+func renderRemoteThread(thread core.RemoteReviewThread, indent string) []string {
+	lines := []string{indent + inlineCommentStyle.Render(inlineCommentIconStyle.Render(nerdIconComment)+" "+inlineCommentIDStyle.Render(providerThreadLabel(thread))+" "+inlineCommentMutedStyle.Render("remote read-only"))}
+	for _, comment := range thread.Comments {
+		prefix := comment.Author
+		if prefix == "" {
+			prefix = "remote"
+		}
+		for _, bodyLine := range strings.Split(comment.Body, "\n") {
+			lines = append(lines, indent+inlineCommentStyle.Render(inlineCommentBodyStyle.Render(prefix+": "+bodyLine)))
+		}
+	}
+	return lines
+}
+
+func renderUnmappedRemoteThread(thread core.RemoteReviewThread) []string {
+	label := providerThreadLabel(thread)
+	if len(thread.Comments) == 0 {
+		return []string{inlineCommentStyle.Render(label + " unmapped remote thread")}
+	}
+	first := thread.Comments[0].Body
+	if len([]rune(first)) > 80 {
+		first = string([]rune(first)[:80]) + "…"
+	}
+	return []string{inlineCommentStyle.Render(label + " unmapped: " + first)}
+}
+
+func providerThreadLabel(thread core.RemoteReviewThread) string {
+	if thread.ProviderID != "" {
+		return "[" + thread.ProviderID + "]"
+	}
+	return "[remote]"
 }
 
 func displayReviewCommentID(id string) string {

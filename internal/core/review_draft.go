@@ -33,19 +33,89 @@ type ReviewCommentInput struct {
 }
 
 type ReviewComment struct {
-	ID       string          `json:"id"`
-	FilePath string          `json:"file"`
-	Range    ReviewLineRange `json:"range"`
-	Body     string          `json:"body"`
+	ID           string               `json:"id"`
+	FilePath     string               `json:"file"`
+	Range        ReviewLineRange      `json:"range"`
+	Body         string               `json:"body"`
+	State        ReviewCommentState   `json:"state,omitempty"`
+	ProviderRefs []ProviderCommentRef `json:"provider_refs,omitempty"`
+}
+
+// ProviderCommentRef maps a local comment to its remote published identifier.
+type ProviderCommentRef struct {
+	ProviderID  string `json:"provider_id"`
+	ExternalID  string `json:"external_id"`
+	ExternalURL string `json:"external_url,omitempty"`
+}
+
+// ReviewDraftSnapshot is an immutable copy of a ReviewDraft at a point in time.
+type ReviewDraftSnapshot struct {
+	ID             string          `json:"id"`
+	Comments       []ReviewComment `json:"comments"`
+	Decision       ReviewDecision  `json:"decision,omitempty"`
+	Summary        string          `json:"summary,omitempty"`
+	IdempotencyKey string          `json:"idempotency_key"`
 }
 
 type ReviewDraft struct {
-	comments []ReviewComment
-	nextID   int
+	comments       []ReviewComment
+	nextID         int
+	decision       ReviewDecision
+	summary        string
+	id             string
+	idempotencyKey string
 }
 
 func NewReviewDraft() *ReviewDraft {
 	return &ReviewDraft{nextID: 1}
+}
+
+func ensureDraftIDs(d *ReviewDraft) {
+	if d.id == "" {
+		d.id = "draft-" + randomHex(8)
+	}
+	if d.idempotencyKey == "" {
+		d.idempotencyKey = "publish-" + randomHex(16)
+	}
+}
+
+// SetDecision records the review verdict on this draft.
+func (d *ReviewDraft) SetDecision(decision ReviewDecision) {
+	d.decision = decision
+}
+
+// Decision returns the current review verdict.
+func (d *ReviewDraft) Decision() ReviewDecision {
+	return d.decision
+}
+
+// SetSummary records a human-readable review summary. Leading/trailing
+// whitespace is trimmed.
+func (d *ReviewDraft) SetSummary(summary string) {
+	d.summary = strings.TrimSpace(summary)
+}
+
+// Summary returns the human-readable review summary.
+func (d *ReviewDraft) Summary() string {
+	return d.summary
+}
+
+// IdempotencyKey returns a stable key for this draft, generating one if needed.
+func (d *ReviewDraft) IdempotencyKey() string {
+	ensureDraftIDs(d)
+	return d.idempotencyKey
+}
+
+// Snapshot captures an immutable copy of the draft state.
+func (d *ReviewDraft) Snapshot() ReviewDraftSnapshot {
+	ensureDraftIDs(d)
+	return ReviewDraftSnapshot{
+		ID:             d.id,
+		Comments:       d.Comments(),
+		Decision:       d.decision,
+		Summary:        d.summary,
+		IdempotencyKey: d.idempotencyKey,
+	}
 }
 
 func (d *ReviewDraft) AddComment(input ReviewCommentInput) (ReviewComment, error) {
@@ -57,6 +127,7 @@ func (d *ReviewDraft) AddComment(input ReviewCommentInput) (ReviewComment, error
 		FilePath: strings.TrimSpace(input.FilePath),
 		Range:    input.Range,
 		Body:     strings.TrimSpace(input.Body),
+		State:    ReviewCommentStateLocal,
 	}
 	d.nextID++
 	d.comments = append(d.comments, comment)
@@ -64,12 +135,32 @@ func (d *ReviewDraft) AddComment(input ReviewCommentInput) (ReviewComment, error
 }
 
 func (d *ReviewDraft) Comments() []ReviewComment {
-	return append([]ReviewComment(nil), d.comments...)
+	comments := append([]ReviewComment(nil), d.comments...)
+	for i := range comments {
+		comments[i].ProviderRefs = append([]ProviderCommentRef(nil), comments[i].ProviderRefs...)
+	}
+	return comments
+}
+
+func (d *ReviewDraft) ApplyPublishedRefs(providerID string, refs []PublishedReviewCommentRef) {
+	for _, ref := range refs {
+		for i := range d.comments {
+			if d.comments[i].ID != ref.LocalCommentID {
+				continue
+			}
+			d.comments[i].State = ReviewCommentStatePublished
+			d.comments[i].ProviderRefs = append(d.comments[i].ProviderRefs, ProviderCommentRef{ProviderID: providerID, ExternalID: ref.ExternalID, ExternalURL: ref.ExternalURL})
+		}
+	}
 }
 
 func (d *ReviewDraft) Clear() {
 	d.comments = nil
 	d.nextID = 1
+	d.decision = ""
+	d.summary = ""
+	d.id = ""
+	d.idempotencyKey = ""
 }
 
 func (d *ReviewDraft) ExportJSON() ([]byte, error) {

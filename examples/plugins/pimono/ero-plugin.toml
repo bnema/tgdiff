@@ -1,0 +1,16 @@
+name = "ero-plugin-pimono"
+version = "0.1.0"
+description = "Reference Pimono human-feedback destination skeleton for Ero"
+manifest_version = "1"
+protocol = "ero.plugin.v1"
+
+[runtime]
+command = "go run ./cmd/ero-plugin-pimono"
+
+[build]
+command = "go build ./cmd/ero-plugin-pimono"
+
+[[contributions]]
+type = "review_provider"
+id = "pimono"
+label = "Pimono"

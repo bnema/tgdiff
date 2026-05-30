@@ -14,6 +14,7 @@ func (m *Model) syncReviewViewport() {
 	if m.reviewDraft != nil {
 		annotations.Comments = m.reviewDraft.Comments()
 	}
+	annotations.RemoteThreads = m.remoteThreads
 	annotations.Editor = m.commentEditor
 	rendered := NewReviewDocument(width).RenderWithAnnotations(m.files, m.selectedFile, m.selectedContext, annotations)
 	currentCursor := m.cursorRow

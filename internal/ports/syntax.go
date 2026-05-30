@@ -1,30 +1,23 @@
 package ports
 
-type SemanticTokenType string
+import syntaxdto "ero/internal/syntax"
+
+type SemanticTokenType = syntaxdto.SemanticTokenType
 
 const (
-	SemanticTokenKeyword     SemanticTokenType = "keyword"
-	SemanticTokenFunction    SemanticTokenType = "function"
-	SemanticTokenTypeName    SemanticTokenType = "type"
-	SemanticTokenName        SemanticTokenType = "name"
-	SemanticTokenString      SemanticTokenType = "string"
-	SemanticTokenNumber      SemanticTokenType = "number"
-	SemanticTokenComment     SemanticTokenType = "comment"
-	SemanticTokenOperator    SemanticTokenType = "operator"
-	SemanticTokenPunctuation SemanticTokenType = "punctuation"
-	SemanticTokenText        SemanticTokenType = "text"
+	SemanticTokenKeyword     = syntaxdto.SemanticTokenKeyword
+	SemanticTokenFunction    = syntaxdto.SemanticTokenFunction
+	SemanticTokenTypeName    = syntaxdto.SemanticTokenTypeName
+	SemanticTokenName        = syntaxdto.SemanticTokenName
+	SemanticTokenString      = syntaxdto.SemanticTokenString
+	SemanticTokenNumber      = syntaxdto.SemanticTokenNumber
+	SemanticTokenComment     = syntaxdto.SemanticTokenComment
+	SemanticTokenOperator    = syntaxdto.SemanticTokenOperator
+	SemanticTokenPunctuation = syntaxdto.SemanticTokenPunctuation
+	SemanticTokenText        = syntaxdto.SemanticTokenText
 )
 
-// SyntaxToken represents a lexical token with position and semantic classification.
-// Type is the normalized SemanticTokenType used by core rendering decisions.
-// SourceType preserves the original lexer token kind for adapters that can use
-// source-specific detail, such as fine-grained syntax highlighting.
-type SyntaxToken struct {
-	Start      int
-	End        int
-	Type       SemanticTokenType
-	SourceType string
-}
+type SyntaxToken = syntaxdto.Token
 
 type SyntaxTokenizer interface {
 	Tokenize(filename string, lines []string) ([][]SyntaxToken, error)

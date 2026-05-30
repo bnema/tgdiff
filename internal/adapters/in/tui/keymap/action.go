@@ -15,6 +15,7 @@ const (
 	ActionClearSelection    Action = "clear_selection"
 	ActionOpenComment       Action = "open_comment"
 	ActionClearReview       Action = "clear_review"
+	ActionPublishReview     Action = "publish_review"
 	ActionCopyReviewJSON    Action = "copy_review_json"
 	ActionCopyPlain         Action = "copy_plain"
 	ActionCopyWithMetadata  Action = "copy_with_metadata"
@@ -52,6 +53,8 @@ func ReviewAction(key string) Action {
 		return ActionOpenComment
 	case "C":
 		return ActionClearReview
+	case "P":
+		return ActionPublishReview
 	case "R":
 		return ActionCopyReviewJSON
 	case "y":

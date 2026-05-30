@@ -1,0 +1,16 @@
+name = "ero-plugin-github"
+version = "0.1.0"
+description = "Reference GitHub review provider skeleton for Ero"
+manifest_version = "1"
+protocol = "ero.plugin.v1"
+
+[runtime]
+command = "go run ./cmd/ero-plugin-github"
+
+[build]
+command = "go build ./cmd/ero-plugin-github"
+
+[[contributions]]
+type = "review_provider"
+id = "github"
+label = "GitHub"

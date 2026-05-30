@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 
 	"ero/internal/core"
+	"ero/internal/ports"
 )
 
 type RepositoryLoader struct{}
@@ -354,6 +355,60 @@ func writeAddedFileDiff(diff *strings.Builder, path string, content []byte) {
 	for _, line := range lines {
 		fmt.Fprintf(diff, "+%s\n", line)
 	}
+}
+
+func (l *RepositoryLoader) WorktreeRoot(repoPath string) (string, error) {
+	return trimmedGit(repoPath, "rev-parse", "--show-toplevel")
+}
+
+func (l *RepositoryLoader) CurrentBranch(repoPath string) (string, error) {
+	return trimmedGit(repoPath, "branch", "--show-current")
+}
+
+func (l *RepositoryLoader) HeadSHA(repoPath string) (string, error) {
+	return trimmedGit(repoPath, "rev-parse", "HEAD")
+}
+
+func (l *RepositoryLoader) DefaultBranch(repoPath string) (string, error) {
+	return l.ResolveBaseBranch(repoPath)
+}
+
+func (l *RepositoryLoader) Remotes(repoPath string) ([]ports.GitRemoteInfo, error) {
+	output, err := runGit(repoPath, "remote", "-v")
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]string{}
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			if _, ok := seen[fields[0]]; !ok {
+				seen[fields[0]] = fields[1]
+			}
+		}
+	}
+	remotes := make([]ports.GitRemoteInfo, 0, len(seen))
+	for name, url := range seen {
+		remotes = append(remotes, ports.GitRemoteInfo{Name: name, URL: url})
+	}
+	sort.Slice(remotes, func(i, j int) bool { return remotes[i].Name < remotes[j].Name })
+	return remotes, nil
+}
+
+func (l *RepositoryLoader) MergeBase(repoPath, baseRef, headRef string) (string, error) {
+	return trimmedGit(repoPath, "merge-base", baseRef, headRef)
+}
+
+func (l *RepositoryLoader) ResolveRevision(repoPath, revision string) (string, error) {
+	return trimmedGit(repoPath, "rev-parse", revision)
+}
+
+func trimmedGit(repoPath string, args ...string) (string, error) {
+	output, err := runGit(repoPath, args...)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(output), nil
 }
 
 func (l *RepositoryLoader) ReadFileLines(repoPath, path string) ([]string, error) {

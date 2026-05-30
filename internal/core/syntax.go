@@ -1,20 +1,20 @@
 package core
 
-import "ero/internal/ports"
+import syntaxdto "ero/internal/syntax"
 
-type SemanticTokenType = ports.SemanticTokenType
+type SemanticTokenType = syntaxdto.SemanticTokenType
 
 const (
-	SemanticTokenKeyword     = ports.SemanticTokenKeyword
-	SemanticTokenFunction    = ports.SemanticTokenFunction
-	SemanticTokenTypeName    = ports.SemanticTokenTypeName
-	SemanticTokenName        = ports.SemanticTokenName
-	SemanticTokenString      = ports.SemanticTokenString
-	SemanticTokenNumber      = ports.SemanticTokenNumber
-	SemanticTokenComment     = ports.SemanticTokenComment
-	SemanticTokenOperator    = ports.SemanticTokenOperator
-	SemanticTokenPunctuation = ports.SemanticTokenPunctuation
-	SemanticTokenText        = ports.SemanticTokenText
+	SemanticTokenKeyword     = syntaxdto.SemanticTokenKeyword
+	SemanticTokenFunction    = syntaxdto.SemanticTokenFunction
+	SemanticTokenTypeName    = syntaxdto.SemanticTokenTypeName
+	SemanticTokenName        = syntaxdto.SemanticTokenName
+	SemanticTokenString      = syntaxdto.SemanticTokenString
+	SemanticTokenNumber      = syntaxdto.SemanticTokenNumber
+	SemanticTokenComment     = syntaxdto.SemanticTokenComment
+	SemanticTokenOperator    = syntaxdto.SemanticTokenOperator
+	SemanticTokenPunctuation = syntaxdto.SemanticTokenPunctuation
+	SemanticTokenText        = syntaxdto.SemanticTokenText
 )
 
-type SyntaxToken = ports.SyntaxToken
+type SyntaxToken = syntaxdto.Token
