@@ -127,11 +127,13 @@ go test ./plugins/...
 go build ./plugins/github/cmd/ero-plugin-github ./plugins/pi-coding-agent/cmd/ero-plugin-pi-coding-agent
 ```
 
-For pi-coding-agent, load the bridge extension first:
+For pi-coding-agent, install the bridge extension package first:
 
 ```bash
-pi -e ./plugins/pi-coding-agent
+pi install ./plugins/pi-coding-agent
 ```
+
+For a one-off development session, `pi -e ./plugins/pi-coding-agent` also works, but it only loads the extension for that run.
 
 The bridge records active sessions in an owner-only runtime registry and uses per-session Unix sockets. Ero selects a session by `PI_CODING_AGENT_SESSION_ID` when set, otherwise by repository path plus branch/SHA when available.
 
