@@ -35,10 +35,10 @@ func TestFakePluginProcess(t *testing.T) {
 
 	switch os.Getenv("FAKE_PLUGIN_MODE") {
 	case "malformed":
-		fmt.Fprintln(os.Stdout, "not json")
+		_, _ = fmt.Fprintln(os.Stdout, "not json")
 		os.Exit(0)
 	case "stderr":
-		fmt.Fprintln(os.Stderr, "diagnostic from fake plugin")
+		_, _ = fmt.Fprintln(os.Stderr, "diagnostic from fake plugin")
 	case "timeout":
 		select {}
 	}
@@ -46,7 +46,7 @@ func TestFakePluginProcess(t *testing.T) {
 	// Run the actual plugin server.
 	srv := &fakePluginServer{protocolOverride: os.Getenv("FAKE_PLUGIN_PROTOCOL")}
 	if err := pluginsdk.ServeReviewProvider(context.Background(), srv, os.Stdin, os.Stdout); err != nil {
-		fmt.Fprintf(os.Stderr, "fake plugin error: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "fake plugin error: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(0)

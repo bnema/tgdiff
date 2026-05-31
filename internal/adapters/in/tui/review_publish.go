@@ -38,17 +38,16 @@ func (m Model) openPublishReview() (Model, tea.Cmd) {
 		m.setCopyFeedback("No review providers available")
 		return m, nil
 	}
+	focused := firstPublishableProviderIndex(m.providerInfos)
 	selected := make(map[string]bool, len(m.providerInfos))
-	for i, info := range m.providerInfos {
-		if i == 0 && info.Capabilities.PublishReview {
-			selected[info.ID] = true
-		}
+	if focused >= 0 && focused < len(m.providerInfos) && m.providerInfos[focused].Capabilities.PublishReview {
+		selected[m.providerInfos[focused].ID] = true
 	}
 	log.Info().Int("provider_count", len(m.providerInfos)).Msg("publish overlay opened")
 	m.publish = publishState{
 		active:                 true,
 		selected:               selected,
-		focused:                firstPublishableProviderIndex(m.providerInfos),
+		focused:                focused,
 		unsupportedDecision:    map[string]core.ReviewDecision{},
 		confirmWithoutDecision: map[string]bool{},
 		message:                "Select a destination, then press enter to publish.",
@@ -200,7 +199,6 @@ func (m *Model) movePublishFocus(delta int) {
 		return
 	}
 	m.publish.focused = (m.publish.focused + delta + len(m.providerInfos)) % len(m.providerInfos)
-	m.selectOnlyPublishProvider(m.publish.focused)
 }
 
 func (m *Model) toggleFocusedPublishProvider() {
@@ -208,14 +206,18 @@ func (m *Model) toggleFocusedPublishProvider() {
 }
 
 func (m *Model) togglePublishProvider(idx int) {
-	m.selectOnlyPublishProvider(idx)
-}
-
-func (m *Model) selectOnlyPublishProvider(idx int) {
 	if m.publish.publishing || idx < 0 || idx >= len(m.providerInfos) {
 		return
 	}
-	m.publish.selected = map[string]bool{m.providerInfos[idx].ID: true}
+	if m.publish.selected == nil {
+		m.publish.selected = map[string]bool{}
+	}
+	id := m.providerInfos[idx].ID
+	if m.publish.selected[id] {
+		delete(m.publish.selected, id)
+		return
+	}
+	m.publish.selected[id] = true
 }
 
 func firstPublishableProviderIndex(infos []core.ReviewProviderInfo) int {

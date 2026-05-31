@@ -232,7 +232,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.helpActive = false
 				return m, nil
 			case "q", "ctrl+c":
-				return m, tea.Quit
+				return m, tea.Batch(m.closeReviewProvidersCmd(), tea.Quit)
 			default:
 				return m, nil
 			}

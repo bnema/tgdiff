@@ -59,9 +59,7 @@ func newPluginListCommand(manager PluginManager, out io.Writer, jsonOutput *bool
 
 			writer := commandOut(cmd, out)
 			if *jsonOutput {
-				enc := json.NewEncoder(writer)
-				enc.SetIndent("", "  ")
-				return enc.Encode(plugins)
+				return encodeJSON(writer, plugins)
 			}
 
 			return renderPluginList(writer, plugins)
@@ -87,9 +85,7 @@ func newPluginInstallCommand(manager PluginManager, out io.Writer, jsonOutput *b
 
 			writer := commandOut(cmd, out)
 			if *jsonOutput {
-				enc := json.NewEncoder(writer)
-				enc.SetIndent("", "  ")
-				return enc.Encode(result)
+				return encodeJSON(writer, result)
 			}
 
 			_, err = fmt.Fprintln(writer, render.PluginInstall(result))
@@ -126,9 +122,7 @@ are reported as skipped.`,
 
 			writer := commandOut(cmd, out)
 			if *jsonOutput {
-				enc := json.NewEncoder(writer)
-				enc.SetIndent("", "  ")
-				return enc.Encode(results)
+				return encodeJSON(writer, results)
 			}
 
 			_, err = fmt.Fprintln(writer, render.PluginUpdates(results))
@@ -155,15 +149,19 @@ func newPluginRemoveCommand(manager PluginManager, out io.Writer, jsonOutput *bo
 
 			writer := commandOut(cmd, out)
 			if *jsonOutput {
-				enc := json.NewEncoder(writer)
-				enc.SetIndent("", "  ")
-				return enc.Encode(result)
+				return encodeJSON(writer, result)
 			}
 
 			_, err = fmt.Fprintln(writer, render.PluginRemove(result))
 			return err
 		},
 	}
+}
+
+func encodeJSON(writer io.Writer, v any) error {
+	enc := json.NewEncoder(writer)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 func commandOut(cmd *cobra.Command, configured io.Writer) io.Writer {

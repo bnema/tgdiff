@@ -29,7 +29,7 @@ func RenderPluginList(items []PluginListItem, width int) string {
 
 	for i, item := range items {
 		if i > 0 {
-			b.WriteByte('\n')
+			b.WriteString("\n\n")
 		}
 
 		// Plugin name + version in bold.

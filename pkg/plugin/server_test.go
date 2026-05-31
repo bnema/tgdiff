@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -320,11 +321,12 @@ func TestServeReviewProviderRoundTripSuccess(t *testing.T) {
 	if err := dec.Decode(&resp2); err != nil {
 		t.Fatalf("failed to decode second response: %v", err)
 	}
-	if resp2.ID != "11" {
-		t.Fatalf("expected id 11, got %s", resp2.ID)
+	if resp2.ID != "11" || resp2.Error != nil {
+		t.Fatalf("unexpected publish response: id=%s error=%v", resp2.ID, resp2.Error)
 	}
 
-	if len(provider.methodsCalled) != 2 {
-		t.Fatalf("expected 2 methods called, got %d: %v", len(provider.methodsCalled), provider.methodsCalled)
+	expectedMethods := []string{"initialize", "publish_review"}
+	if !reflect.DeepEqual(provider.methodsCalled, expectedMethods) {
+		t.Fatalf("expected methods %v, got %v", expectedMethods, provider.methodsCalled)
 	}
 }

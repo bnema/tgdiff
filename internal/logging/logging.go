@@ -19,6 +19,11 @@ func Init(cfg Config) (zerowrap.Logger, string, func(), error) {
 		level = "info"
 	}
 
+	levelForConfig := level
+	if levelForConfig == "disabled" {
+		levelForConfig = "info"
+	}
+
 	fileCfg := zerowrap.FileConfig{
 		Enabled:    level != "disabled",
 		Path:       cfg.Path,
@@ -36,7 +41,7 @@ func Init(cfg Config) (zerowrap.Logger, string, func(), error) {
 	}
 
 	log, cleanup, err := zerowrap.NewWithFile(
-		zerowrap.Config{Level: level, Format: "json", Output: io.Discard, Caller: false},
+		zerowrap.Config{Level: levelForConfig, Format: "json", Output: io.Discard, Caller: false},
 		fileCfg,
 	)
 	if err != nil {

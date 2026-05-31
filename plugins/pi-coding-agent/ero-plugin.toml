@@ -5,10 +5,10 @@ manifest_version = "1"
 protocol = "ero.plugin.v1"
 
 [runtime]
-command = "go run ./cmd/ero-plugin-pi-coding-agent"
+command = "./ero-plugin-pi-coding-agent"
 
 [build]
-command = "go build ./cmd/ero-plugin-pi-coding-agent"
+command = "go build -o ./ero-plugin-pi-coding-agent ./cmd/ero-plugin-pi-coding-agent"
 
 [[contributions]]
 type = "review_provider"

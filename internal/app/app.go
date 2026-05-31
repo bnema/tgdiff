@@ -104,7 +104,10 @@ func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner
 		var reviewProviders []ports.ReviewProviderClient
 		pluginManager := pluginadapter.NewManager()
 		providerLoader := pluginadapter.NewReviewProviderLoader(pluginManager)
-		if providers, err := buildReviewProviders(ctx, providerLoader); err == nil {
+		providers, err := buildReviewProviders(ctx, providerLoader)
+		if err != nil {
+			log.Warn().Err(err).Msg("load review providers failed")
+		} else {
 			reviewProviders = providers
 		}
 		var metadata ports.GitMetadataReader

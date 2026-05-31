@@ -142,8 +142,14 @@ async function gitOutput(pi, cwd, args) {
 }
 
 function bridgeRuntimeDir() {
-  const base = process.env.XDG_RUNTIME_DIR || process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
-  const dir = join(base, process.env.XDG_RUNTIME_DIR ? BRIDGE_DIR : join("ero", "runtime", BRIDGE_DIR));
+  let dir;
+  if (process.env.XDG_RUNTIME_DIR) {
+    dir = join(process.env.XDG_RUNTIME_DIR, BRIDGE_DIR);
+  } else {
+    const userCacheDir = process.platform === "darwin" ? join(homedir(), "Library", "Caches") : join(homedir(), ".cache");
+    const base = process.env.XDG_CACHE_HOME || userCacheDir;
+    dir = join(base, "ero", "runtime", BRIDGE_DIR);
+  }
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   chmodSync(dir, 0o700);
   return dir;

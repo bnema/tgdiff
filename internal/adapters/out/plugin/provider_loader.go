@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bnema/zerowrap"
+	"github.com/google/shlex"
+
 	"ero/internal/ports"
 	pluginsdk "ero/pkg/plugin"
 )
@@ -27,14 +30,17 @@ func (l *ReviewProviderLoader) LoadReviewProviders(ctx context.Context) ([]ports
 	if err != nil {
 		return nil, err
 	}
+	log := zerowrap.FromCtx(ctx)
 	providers := make([]ports.ReviewProviderClient, 0)
 	for _, descriptor := range descriptors {
 		manifest, err := LoadManifest(descriptor.Path)
 		if err != nil {
+			log.Warn().Err(err).Str("plugin_path", descriptor.Path).Msg("load plugin manifest failed")
 			continue
 		}
 		command, args := splitRuntimeCommand(manifest.Runtime.Command)
 		if command == "" {
+			log.Warn().Str("plugin_path", descriptor.Path).Msg("plugin runtime command is empty")
 			continue
 		}
 		if !strings.Contains(command, "/") {
@@ -48,6 +54,7 @@ func (l *ReviewProviderLoader) LoadReviewProviders(ctx context.Context) ([]ports
 			}
 			client, err := NewClientForContribution(command, args, descriptor.Path, contribution.ID, l.timeout)
 			if err != nil {
+				log.Warn().Err(err).Str("plugin_path", descriptor.Path).Str("contribution_id", contribution.ID).Msg("create plugin review provider client failed")
 				continue
 			}
 			providers = append(providers, client)
@@ -57,7 +64,10 @@ func (l *ReviewProviderLoader) LoadReviewProviders(ctx context.Context) ([]ports
 }
 
 func splitRuntimeCommand(command string) (string, []string) {
-	fields := strings.Fields(command)
+	fields, err := shlex.Split(command)
+	if err != nil {
+		fields = strings.Fields(command)
+	}
 	if len(fields) == 0 {
 		return "", nil
 	}

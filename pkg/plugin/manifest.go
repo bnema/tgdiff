@@ -1,6 +1,9 @@
 package plugin
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // ---------- manifest v1 ----------
 
@@ -40,26 +43,26 @@ func (m Manifest) Validate() error {
 	if m.ManifestVersion != "1" {
 		return fmt.Errorf("unsupported manifest_version %q (expected \"1\")", m.ManifestVersion)
 	}
-	if m.Name == "" {
+	if strings.TrimSpace(m.Name) == "" {
 		return fmt.Errorf("manifest name is required")
 	}
-	if m.Version == "" {
+	if strings.TrimSpace(m.Version) == "" {
 		return fmt.Errorf("manifest version is required")
 	}
 	if m.Protocol != ProtocolVersion {
 		return fmt.Errorf("unsupported protocol %q (expected %q)", m.Protocol, ProtocolVersion)
 	}
-	if m.Runtime.Command == "" {
+	if strings.TrimSpace(m.Runtime.Command) == "" {
 		return fmt.Errorf("runtime command is required")
 	}
 	if len(m.Contributions) == 0 {
 		return fmt.Errorf("at least one contribution is required")
 	}
 	for i, c := range m.Contributions {
-		if c.Type == "" {
+		if strings.TrimSpace(c.Type) == "" {
 			return fmt.Errorf("contributions[%d]: type is required", i)
 		}
-		if c.ID == "" {
+		if strings.TrimSpace(c.ID) == "" {
 			return fmt.Errorf("contributions[%d]: id is required", i)
 		}
 	}

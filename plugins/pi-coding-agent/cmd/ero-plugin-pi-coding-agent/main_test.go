@@ -44,7 +44,11 @@ func TestPublishReviewSendsMessageToBridge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen unix socket: %v", err)
 	}
-	defer listener.Close()
+	t.Cleanup(func() {
+		if err := listener.Close(); err != nil {
+			t.Fatalf("close listener: %v", err)
+		}
+	})
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -52,7 +56,11 @@ func TestPublishReviewSendsMessageToBridge(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() {
+			if err := conn.Close(); err != nil {
+				t.Errorf("close connection: %v", err)
+			}
+		}()
 		if err := json.NewDecoder(conn).Decode(&got); err != nil {
 			t.Errorf("decode request: %v", err)
 			return
@@ -120,11 +128,6 @@ func TestSelectBridgeSessionAcceptsSameBranchWithDifferentHead(t *testing.T) {
 	if !ok || session.SessionID != "same-branch" {
 		t.Fatalf("expected same branch session, got %#v ok=%v", session, ok)
 	}
-}
-
-func writeBridgeState(t *testing.T, state bridgeState) string {
-	t.Helper()
-	return writeBridgeStateAt(t, filepath.Join(secureTempDir(t), bridgeStateFile), state)
 }
 
 func writeBridgeStateAt(t *testing.T, path string, state bridgeState) string {

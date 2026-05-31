@@ -149,7 +149,18 @@ func (d *ReviewDraft) ApplyPublishedRefs(providerID string, refs []PublishedRevi
 				continue
 			}
 			d.comments[i].State = ReviewCommentStatePublished
-			d.comments[i].ProviderRefs = append(d.comments[i].ProviderRefs, ProviderCommentRef{ProviderID: providerID, ExternalID: ref.ExternalID, ExternalURL: ref.ExternalURL})
+			updated := false
+			for j := range d.comments[i].ProviderRefs {
+				if d.comments[i].ProviderRefs[j].ProviderID == providerID {
+					d.comments[i].ProviderRefs[j].ExternalID = ref.ExternalID
+					d.comments[i].ProviderRefs[j].ExternalURL = ref.ExternalURL
+					updated = true
+					break
+				}
+			}
+			if !updated {
+				d.comments[i].ProviderRefs = append(d.comments[i].ProviderRefs, ProviderCommentRef{ProviderID: providerID, ExternalID: ref.ExternalID, ExternalURL: ref.ExternalURL})
+			}
 		}
 	}
 }

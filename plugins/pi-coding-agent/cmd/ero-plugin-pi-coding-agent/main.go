@@ -165,7 +165,7 @@ func (p piProvider) sendToBridge(ctx context.Context, session bridgeSession, mes
 	if err != nil {
 		return plugin.NewErrorf(plugin.ErrorNetwork, "connect to pi-coding-agent bridge socket: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	deadline := time.Now().Add(10 * time.Second)
 	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
 		deadline = ctxDeadline
@@ -234,10 +234,6 @@ func scoreBridgeSession(session bridgeSession, candidates []string, repo plugin.
 		score += 8
 	}
 	return score
-}
-
-func matchesRepositoryPath(session bridgeSession, candidates []string) bool {
-	return pathMatchScore(session, candidates) >= 0
 }
 
 func pathMatchScore(session bridgeSession, candidates []string) int {

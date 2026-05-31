@@ -1,7 +1,6 @@
 package component
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -47,9 +46,8 @@ func TestRenderPluginListMultiple(t *testing.T) {
 	assert.Contains(t, result, "pi-coding-agent v0.2.0")
 	assert.Contains(t, result, "active")
 
-	// Should have a newline separator between entries.
-	parts := strings.SplitN(result, "\n", 3)
-	assert.Len(t, parts, 3) // header + source + empty = 3, but actually: header, contrib, source, empty, header, contrib, source
+	// Should have a blank line separator between entries.
+	assert.Contains(t, result, "\n\n")
 }
 
 func TestRenderPluginListTruncatesNarrow(t *testing.T) {

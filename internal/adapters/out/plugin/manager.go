@@ -181,7 +181,7 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]ports.PluginU
 		}
 
 		pluginDir := m.pluginDir(source)
-		previousRef, err := m.currentRef(pluginDir)
+		previousRef, err := m.currentRef(ctx, pluginDir)
 		if err != nil {
 			results = append(results, ports.PluginUpdateResult{
 				Source:  entry.Source,
@@ -200,10 +200,10 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]ports.PluginU
 			continue
 		}
 
-		updatedRef, _ := m.currentRef(pluginDir)
+		updatedRef, _ := m.currentRef(ctx, pluginDir)
 		results = append(results, ports.PluginUpdateResult{
 			Source:      entry.Source,
-			Name:        source.Path,
+			Name:        m.pluginName(source),
 			PreviousRef: previousRef,
 			UpdatedRef:  updatedRef,
 		})
@@ -336,7 +336,7 @@ func (m *Manager) fetchAndReset(ctx context.Context, pluginDir string) error {
 	}
 
 	// Get the default branch.
-	branch, err := m.defaultBranch(pluginDir)
+	branch, err := m.defaultBranch(ctx, pluginDir)
 	if err != nil {
 		return err
 	}
@@ -344,8 +344,8 @@ func (m *Manager) fetchAndReset(ctx context.Context, pluginDir string) error {
 	return m.runGit(ctx, pluginDir, "reset", "--hard", "origin/"+branch)
 }
 
-func (m *Manager) currentRef(pluginDir string) (string, error) {
-	cmd := exec.Command(m.gitCommand, "rev-parse", "HEAD")
+func (m *Manager) currentRef(ctx context.Context, pluginDir string) (string, error) {
+	cmd := exec.CommandContext(ctx, m.gitCommand, "rev-parse", "HEAD")
 	cmd.Dir = pluginDir
 	out, err := cmd.Output()
 	if err != nil {
@@ -354,14 +354,26 @@ func (m *Manager) currentRef(pluginDir string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func (m *Manager) defaultBranch(pluginDir string) (string, error) {
-	cmd := exec.Command(m.gitCommand, "rev-parse", "--abbrev-ref", "HEAD")
+func (m *Manager) defaultBranch(ctx context.Context, pluginDir string) (string, error) {
+	cmd := exec.CommandContext(ctx, m.gitCommand, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
 	cmd.Dir = pluginDir
 	out, err := cmd.Output()
+	if err == nil {
+		branch := strings.TrimSpace(string(out))
+		return strings.TrimPrefix(branch, "origin/"), nil
+	}
+
+	cmd = exec.CommandContext(ctx, m.gitCommand, "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = pluginDir
+	out, err = cmd.Output()
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(out)), nil
+	branch := strings.TrimSpace(string(out))
+	if branch == "HEAD" {
+		return "", fmt.Errorf("could not determine default branch")
+	}
+	return branch, nil
 }
 
 func (m *Manager) pluginDir(source Source) string {

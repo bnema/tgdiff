@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -60,6 +61,7 @@ func NewRootCommand(cfg *viper.Viper, run RunFunc) (*cobra.Command, error) {
 		return nil, fmt.Errorf("bind log-file flag: %w", err)
 	}
 	cfg.SetEnvPrefix("ERO")
+	cfg.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	cfg.AutomaticEnv()
 
 	cmd.AddCommand(diffModeCommands(cfg, runCommand)...)
