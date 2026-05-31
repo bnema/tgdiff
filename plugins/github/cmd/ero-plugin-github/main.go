@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	gh "github.com/cli/go-gh/v2"
 
 	"ero/pkg/plugin"
 )
@@ -13,6 +17,12 @@ const providerID = "github"
 
 type githubProvider struct {
 	getenv func(string) string
+	execGH func(context.Context, ...string) (string, string, error)
+}
+
+type ghPR struct {
+	Number int    `json:"number"`
+	URL    string `json:"url"`
 }
 
 func main() {
@@ -63,18 +73,38 @@ func (p githubProvider) LoadRemoteThreads(_ context.Context, _ plugin.LoadRemote
 	return plugin.LoadRemoteThreadsResult{}, plugin.NewError(plugin.ErrorAuthRequired, "GitHub remote comment loading requires a GitHub API implementation and credentials")
 }
 
-func (p githubProvider) PublishReview(_ context.Context, req plugin.PublishReviewParams) (plugin.PublishReviewResultData, error) {
-	if p.getenv == nil {
-		p.getenv = os.Getenv
+func (p githubProvider) PublishReview(ctx context.Context, req plugin.PublishReviewParams) (plugin.PublishReviewResultData, error) {
+	pr, err := p.currentPullRequest(ctx)
+	if err != nil {
+		return plugin.PublishReviewResultData{}, err
 	}
-	if p.getenv("GITHUB_TOKEN") == "" && p.getenv("GH_TOKEN") == "" {
-		return plugin.PublishReviewResultData{}, plugin.NewError(plugin.ErrorAuthRequired, "set GITHUB_TOKEN or GH_TOKEN to publish to GitHub")
+	return plugin.PublishReviewResultData{}, plugin.NewErrorf(plugin.ErrorUnsupportedCapability, "GitHub PR #%d detected, but publishing review comments is not implemented yet", pr.Number)
+}
+
+func (p githubProvider) currentPullRequest(ctx context.Context) (ghPR, error) {
+	if p.execGH == nil {
+		p.execGH = execGH
 	}
-	return plugin.PublishReviewResultData{Result: plugin.ReviewPublishResult{
-		ProviderID:       providerID,
-		ExternalReviewID: "dry-run-" + req.Payload.Context.Session.LocalReviewID,
-		PublishedRefs:    []plugin.PublishedReviewCommentRef{},
-	}}, nil
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	stdout, stderr, err := p.execGH(ctx, "pr", "view", "--json", "number,url")
+	if err != nil {
+		message := strings.TrimSpace(stderr)
+		if message == "" {
+			message = "no pull request associated with the current branch"
+		}
+		return ghPR{}, plugin.NewErrorf(plugin.ErrorNotApplicable, "no pull request found for current branch: %s", message)
+	}
+	var pr ghPR
+	if err := json.Unmarshal([]byte(stdout), &pr); err != nil || pr.Number == 0 {
+		return ghPR{}, plugin.NewError(plugin.ErrorNotApplicable, "no pull request found for current branch")
+	}
+	return pr, nil
+}
+
+func execGH(ctx context.Context, args ...string) (string, string, error) {
+	stdout, stderr, err := gh.ExecContext(ctx, args...)
+	return stdout.String(), stderr.String(), err
 }
 
 func isGitHubRemote(url string) bool {

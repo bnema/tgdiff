@@ -18,10 +18,26 @@ func TestDetectContextRequiresGitHubRemote(t *testing.T) {
 	}
 }
 
-func TestPublishReviewRequiresToken(t *testing.T) {
-	provider := githubProvider{getenv: func(string) string { return "" }}
+func TestPublishReviewRequiresAssociatedPullRequest(t *testing.T) {
+	provider := githubProvider{execGH: func(context.Context, ...string) (string, string, error) {
+		return "", "no pull requests found", assertAnError{}
+	}}
 	_, err := provider.PublishReview(context.Background(), plugin.PublishReviewParams{})
-	if plugin.AsError(err) == nil || plugin.AsError(err).Code != plugin.ErrorAuthRequired {
-		t.Fatalf("expected auth_required, got %v", err)
+	if plugin.AsError(err) == nil || plugin.AsError(err).Code != plugin.ErrorNotApplicable {
+		t.Fatalf("expected not_applicable, got %v", err)
 	}
 }
+
+func TestPublishReviewReportsUnimplementedAfterPRDetected(t *testing.T) {
+	provider := githubProvider{execGH: func(context.Context, ...string) (string, string, error) {
+		return `{"number": 12, "url": "https://github.com/owner/repo/pull/12"}`, "", nil
+	}}
+	_, err := provider.PublishReview(context.Background(), plugin.PublishReviewParams{})
+	if plugin.AsError(err) == nil || plugin.AsError(err).Code != plugin.ErrorUnsupportedCapability {
+		t.Fatalf("expected unsupported_capability, got %v", err)
+	}
+}
+
+type assertAnError struct{}
+
+func (assertAnError) Error() string { return "assert error" }
