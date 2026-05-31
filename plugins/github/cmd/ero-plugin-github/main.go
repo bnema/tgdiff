@@ -60,7 +60,7 @@ func (p githubProvider) Initialize(_ context.Context, req plugin.InitializeReque
 					plugin.ReviewDecisionRequestChanges,
 					plugin.ReviewDecisionApprove,
 				},
-				IdempotentPublish: true,
+				IdempotentPublish: false,
 			},
 		},
 	}, nil
@@ -103,7 +103,12 @@ func (p githubProvider) PublishReview(ctx context.Context, req plugin.PublishRev
 		return plugin.PublishReviewResultData{}, plugin.NewErrorf(plugin.ErrorNetwork, "publish GitHub review: %s", message)
 	}
 	var response ghReviewResponse
-	_ = json.Unmarshal([]byte(stdout), &response)
+	if err := json.Unmarshal([]byte(stdout), &response); err != nil {
+		return plugin.PublishReviewResultData{}, plugin.NewErrorf(plugin.ErrorRemoteValidationFailed, "parse GitHub review publish response: %v", err)
+	}
+	if response.ID == 0 {
+		return plugin.PublishReviewResultData{}, plugin.NewError(plugin.ErrorRemoteValidationFailed, "GitHub review publish response did not include a review id")
+	}
 	return plugin.PublishReviewResultData{Result: plugin.ReviewPublishResult{
 		ProviderID:       providerID,
 		ExternalReviewID: githubReviewID(response, pr),
@@ -120,12 +125,18 @@ func (p githubProvider) currentPullRequest(ctx context.Context) (ghPR, error) {
 	if err != nil {
 		message := strings.TrimSpace(stderr)
 		if message == "" {
-			message = "no pull request associated with the current branch"
+			message = err.Error()
 		}
-		return ghPR{}, plugin.NewErrorf(plugin.ErrorNotApplicable, "no pull request found for current branch: %s", message)
+		if strings.Contains(strings.ToLower(message), "no pull request") || strings.Contains(strings.ToLower(message), "no pull requests") {
+			return ghPR{}, plugin.NewErrorf(plugin.ErrorNotApplicable, "no pull request found for current branch: %s", message)
+		}
+		return ghPR{}, plugin.NewErrorf(plugin.ErrorAuthRequired, "GitHub CLI PR lookup failed; ensure gh is installed and authenticated: %s", message)
 	}
 	var pr ghPR
-	if err := json.Unmarshal([]byte(stdout), &pr); err != nil || pr.Number == 0 {
+	if err := json.Unmarshal([]byte(stdout), &pr); err != nil {
+		return ghPR{}, plugin.NewErrorf(plugin.ErrorRemoteValidationFailed, "parse GitHub PR lookup response: %v", err)
+	}
+	if pr.Number == 0 {
 		return ghPR{}, plugin.NewError(plugin.ErrorNotApplicable, "no pull request found for current branch")
 	}
 	return pr, nil

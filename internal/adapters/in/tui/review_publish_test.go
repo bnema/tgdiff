@@ -52,7 +52,7 @@ func TestPublishOverlaySupportsKeyboardFocusAndToggle(t *testing.T) {
 
 	view := stripANSI(m.View().Content)
 	require.Contains(t, view, "↑↓/j/k move")
-	require.Contains(t, view, "space toggle")
+	require.Contains(t, view, "space select")
 }
 
 func TestPublishReviewSuccess(t *testing.T) {
@@ -60,6 +60,7 @@ func TestPublishReviewSuccess(t *testing.T) {
 	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
 	m.reviewProviders = []ports.ReviewProviderClient{fakeProviderAsPort{provider}}
 	m.providerInfos = []core.ReviewProviderInfo{provider.info}
+	m.providerInfoByClient = map[ports.ReviewProviderClient]core.ReviewProviderInfo{m.reviewProviders[0]: provider.info}
 	m.reviewDraft.SetDecision(core.ReviewDecisionComment)
 	m, _ = m.openPublishReview()
 	updated, cmd := m.publishSelectedProviders()
@@ -86,6 +87,7 @@ func TestPublishReviewFailedProvider(t *testing.T) {
 	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
 	m.reviewProviders = []ports.ReviewProviderClient{fakeProviderAsPort{provider}}
 	m.providerInfos = []core.ReviewProviderInfo{provider.info}
+	m.providerInfoByClient = map[ports.ReviewProviderClient]core.ReviewProviderInfo{m.reviewProviders[0]: provider.info}
 	m, _ = m.openPublishReview()
 	updated, cmd := m.publishSelectedProviders()
 	m = updated
@@ -147,6 +149,7 @@ func TestPublishReviewUnsupportedDecisionWarning(t *testing.T) {
 	m := NewModelWithReviewProviders([]core.ReviewFile{reviewFile("demo.go", "package main")}, nil, nil, core.ReviewRequest{}, nil, core.ReviewContext{}, nil)
 	m.reviewProviders = []ports.ReviewProviderClient{fakeProviderAsPort{provider}}
 	m.providerInfos = []core.ReviewProviderInfo{provider.info}
+	m.providerInfoByClient = map[ports.ReviewProviderClient]core.ReviewProviderInfo{m.reviewProviders[0]: provider.info}
 	m.reviewDraft.SetDecision(core.ReviewDecisionApprove)
 	m, _ = m.openPublishReview()
 	updated, cmd := m.publishSelectedProviders()

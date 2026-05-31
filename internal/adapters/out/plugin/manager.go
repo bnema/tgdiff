@@ -320,6 +320,7 @@ func (m *Manager) installGit(ctx context.Context, source Source) (InstallResult,
 	// Checkout pinned ref.
 	if source.Pinned {
 		if err := m.runGit(ctx, pluginDir, "checkout", source.Ref); err != nil {
+			_ = os.RemoveAll(pluginDir)
 			return InstallResult{}, fmt.Errorf("checkout ref %q: %w", source.Ref, err)
 		}
 	}
@@ -341,7 +342,7 @@ func (m *Manager) installGit(ctx context.Context, source Source) (InstallResult,
 	return InstallResult{
 		Name:    manifest.Name,
 		Version: manifest.Version,
-		Source:  source.Raw,
+		Source:  sourceConfigString(source),
 		Path:    pluginDir,
 	}, nil
 }
@@ -359,7 +360,7 @@ func (m *Manager) installLocal(source Source) (InstallResult, error) {
 	return InstallResult{
 		Name:    manifest.Name,
 		Version: manifest.Version,
-		Source:  source.Raw,
+		Source:  sourceConfigString(source),
 		Path:    source.LocalPath,
 	}, nil
 }
@@ -421,6 +422,16 @@ func (m *Manager) pluginName(source Source) string {
 		return source.Path
 	}
 	return manifest.Name
+}
+
+func sourceConfigString(source Source) string {
+	if source.Type == SourceTypeLocal && source.LocalPath != "" {
+		return source.LocalPath
+	}
+	if source.Raw != "" {
+		return source.Raw
+	}
+	return source.Repo
 }
 
 func buildCloneURL(source Source) string {
@@ -487,18 +498,15 @@ func (m *Manager) addConfigEntry(source Source) error {
 		return err
 	}
 
+	configSource := sourceConfigString(source)
 	// Check for duplicate.
 	for _, entry := range cfg.Plugins {
-		if entry.Source == source.Raw || entry.Source == source.Repo {
+		if entry.Source == configSource || entry.Source == source.Raw || entry.Source == source.Repo {
 			return fmt.Errorf("plugin source %q is already in config", entry.Source)
 		}
 	}
 
-	if source.Raw != "" {
-		cfg.Plugins = append(cfg.Plugins, pluginEntry{Source: source.Raw})
-	} else {
-		cfg.Plugins = append(cfg.Plugins, pluginEntry{Source: source.Repo})
-	}
+	cfg.Plugins = append(cfg.Plugins, pluginEntry{Source: configSource})
 
 	return m.saveConfig(cfg)
 }

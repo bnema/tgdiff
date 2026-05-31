@@ -81,7 +81,7 @@ func (p piProvider) Initialize(_ context.Context, req plugin.InitializeRequest) 
 					plugin.ReviewDecisionRequestChanges,
 					plugin.ReviewDecisionApprove,
 				},
-				IdempotentPublish: true,
+				IdempotentPublish: false,
 			},
 		},
 	}, nil
@@ -107,6 +107,8 @@ func (p piProvider) PublishReview(ctx context.Context, req plugin.PublishReviewP
 	if err != nil {
 		return plugin.PublishReviewResultData{}, plugin.NewError(plugin.ErrorAuthRequired, err.Error())
 	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
 	session, ok := selectBridgeSession(sessions, req.Payload.Context.Repository, p.env("PI_CODING_AGENT_SESSION_ID"))
 	if !ok {
 		return plugin.PublishReviewResultData{}, plugin.NewError(plugin.ErrorAuthRequired, "start pi-coding-agent with the Ero bridge extension loaded, or set PI_CODING_AGENT_SESSION_ID to an active bridge session")

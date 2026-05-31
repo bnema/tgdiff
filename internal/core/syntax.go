@@ -1,20 +1,23 @@
 package core
 
-import syntaxdto "ero/internal/syntax"
-
-type SemanticTokenType = syntaxdto.SemanticTokenType
+type SemanticTokenType string
 
 const (
-	SemanticTokenKeyword     = syntaxdto.SemanticTokenKeyword
-	SemanticTokenFunction    = syntaxdto.SemanticTokenFunction
-	SemanticTokenTypeName    = syntaxdto.SemanticTokenTypeName
-	SemanticTokenName        = syntaxdto.SemanticTokenName
-	SemanticTokenString      = syntaxdto.SemanticTokenString
-	SemanticTokenNumber      = syntaxdto.SemanticTokenNumber
-	SemanticTokenComment     = syntaxdto.SemanticTokenComment
-	SemanticTokenOperator    = syntaxdto.SemanticTokenOperator
-	SemanticTokenPunctuation = syntaxdto.SemanticTokenPunctuation
-	SemanticTokenText        = syntaxdto.SemanticTokenText
+	SemanticTokenKeyword     SemanticTokenType = "keyword"
+	SemanticTokenFunction    SemanticTokenType = "function"
+	SemanticTokenTypeName    SemanticTokenType = "type"
+	SemanticTokenName        SemanticTokenType = "name"
+	SemanticTokenString      SemanticTokenType = "string"
+	SemanticTokenNumber      SemanticTokenType = "number"
+	SemanticTokenComment     SemanticTokenType = "comment"
+	SemanticTokenOperator    SemanticTokenType = "operator"
+	SemanticTokenPunctuation SemanticTokenType = "punctuation"
+	SemanticTokenText        SemanticTokenType = "text"
 )
 
-type SyntaxToken = syntaxdto.Token
+type SyntaxToken struct {
+	Start      int
+	End        int
+	Type       SemanticTokenType
+	SourceType string
+}

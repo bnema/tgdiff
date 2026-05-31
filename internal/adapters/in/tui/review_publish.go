@@ -51,7 +51,7 @@ func (m Model) openPublishReview() (Model, tea.Cmd) {
 		focused:                firstPublishableProviderIndex(m.providerInfos),
 		unsupportedDecision:    map[string]core.ReviewDecision{},
 		confirmWithoutDecision: map[string]bool{},
-		message:                "Select destinations, then press enter to publish.",
+		message:                "Select a destination, then press enter to publish.",
 	}
 	return m, nil
 }
@@ -252,12 +252,8 @@ func (m Model) providerClientsFor(infos []core.ReviewProviderInfo) []providerCli
 		selected[info.ID] = info
 	}
 	result := make([]providerClientWithInfo, 0, len(infos))
-	for i, client := range m.reviewProviders {
+	for _, client := range m.reviewProviders {
 		providerInfo, ok := m.providerInfoByClient[client]
-		if !ok && i < len(m.providerInfos) {
-			providerInfo = m.providerInfos[i]
-			ok = true
-		}
 		if !ok {
 			continue
 		}
@@ -314,7 +310,7 @@ func (m Model) renderPublishPane(width int) string {
 		b.WriteString(theme.StatusInfoStyle.Render("Publishing… waiting for provider response"))
 		b.WriteString("\n")
 	}
-	b.WriteString(theme.MutedStyle.Render("↑↓/j/k move · space toggle · enter publish · esc cancel"))
+	b.WriteString(theme.MutedStyle.Render("↑↓/j/k move · space select · enter publish · esc cancel"))
 	return theme.SearchPaneStyle.Width(min(max(width-8, 32), 76)).Render(b.String())
 }
 
@@ -330,15 +326,16 @@ func (m Model) renderPublishProviderRow(index int, info core.ReviewProviderInfo,
 	if !info.Capabilities.PublishReview {
 		capability = "read-only"
 	}
+	rowWidth := min(max(width-12, 24), 72)
 	row := fmt.Sprintf("%d  %s  %s", index+1, mark, label)
 	if decision, ok := m.publish.unsupportedDecision[info.ID]; ok {
-		row += fmt.Sprintf("  %s", theme.MutedStyle.Render("does not support "+string(decision)))
+		row += "  does not support " + string(decision)
 	} else {
-		row += "  " + theme.MutedStyle.Render(capability)
+		row += "  " + capability
 	}
-	row = truncatePublishRow(row, min(max(width-12, 24), 72))
+	row = truncatePlainRow(row, rowWidth)
 	if focused {
-		return theme.SearchSelectedRowStyle.Width(min(max(width-12, 24), 72)).Render(row)
+		return theme.SearchSelectedRowStyle.Width(rowWidth).Render(row)
 	}
 	if selected {
 		return theme.HelpLabelStyle.Render(row)
@@ -346,18 +343,11 @@ func (m Model) renderPublishProviderRow(index int, info core.ReviewProviderInfo,
 	return theme.MutedStyle.Render(row)
 }
 
-func truncatePublishRow(row string, width int) string {
+func truncatePlainRow(row string, width int) string {
 	if lipgloss.Width(row) <= width {
 		return row
 	}
-	runes := []rune(row)
-	if width <= 1 {
-		return "…"
-	}
-	if len(runes) > width-1 {
-		return string(runes[:width-1]) + "…"
-	}
-	return row
+	return string([]rune(row)[:max(width-1, 0)]) + "…"
 }
 
 func providerDisplayLabel(info core.ReviewProviderInfo) string {

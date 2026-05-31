@@ -81,6 +81,25 @@ func TestManifestMissingName(t *testing.T) {
 	}
 }
 
+func TestManifestMissingVersion(t *testing.T) {
+	t.Parallel()
+
+	m := plugin.Manifest{
+		Name:            "github",
+		Protocol:        plugin.ProtocolVersion,
+		ManifestVersion: "1",
+		Runtime:         plugin.RuntimeConfig{Command: "./bin/plugin"},
+		Contributions: []plugin.Contribution{
+			{Type: plugin.ContributionReviewProvider, ID: "github", Label: "GitHub"},
+		},
+	}
+
+	err := m.Validate()
+	if err == nil {
+		t.Fatal("expected error for missing version")
+	}
+}
+
 func TestManifestMissingRuntimeCommand(t *testing.T) {
 	t.Parallel()
 
@@ -95,6 +114,23 @@ func TestManifestMissingRuntimeCommand(t *testing.T) {
 	err := m.Validate()
 	if err == nil {
 		t.Fatal("expected error for missing runtime command")
+	}
+}
+
+func TestManifestRequiresContribution(t *testing.T) {
+	t.Parallel()
+
+	m := plugin.Manifest{
+		Name:            "github",
+		Version:         "0.1.0",
+		Protocol:        plugin.ProtocolVersion,
+		ManifestVersion: "1",
+		Runtime:         plugin.RuntimeConfig{Command: "./bin/plugin"},
+	}
+
+	err := m.Validate()
+	if err == nil {
+		t.Fatal("expected error for missing contributions")
 	}
 }
 

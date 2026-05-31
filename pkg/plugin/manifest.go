@@ -43,11 +43,17 @@ func (m Manifest) Validate() error {
 	if m.Name == "" {
 		return fmt.Errorf("manifest name is required")
 	}
+	if m.Version == "" {
+		return fmt.Errorf("manifest version is required")
+	}
 	if m.Protocol != ProtocolVersion {
 		return fmt.Errorf("unsupported protocol %q (expected %q)", m.Protocol, ProtocolVersion)
 	}
 	if m.Runtime.Command == "" {
 		return fmt.Errorf("runtime command is required")
+	}
+	if len(m.Contributions) == 0 {
+		return fmt.Errorf("at least one contribution is required")
 	}
 	for i, c := range m.Contributions {
 		if c.Type == "" {

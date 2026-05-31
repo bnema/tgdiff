@@ -170,7 +170,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clearSelection()
 		m.commentEditor = nil
 		m.reviewDraft = core.NewReviewDraft()
-		m.reviewContext = core.ReviewContext{}
 		m.providerInfos = nil
 		m.remoteThreads = nil
 		m.providerInfoByClient = map[ports.ReviewProviderClient]core.ReviewProviderInfo{}
@@ -178,6 +177,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resetContextSelection()
 		m.reviewViewport.GotoTop()
 		m.syncReviewViewport()
+		if len(m.reviewProviders) > 0 {
+			return m, m.loadReviewProvidersCmd()
+		}
 		return m, nil
 	case reviewLoadFailedMsg:
 		m.loading = false

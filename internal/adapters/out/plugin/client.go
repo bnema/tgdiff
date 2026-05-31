@@ -223,8 +223,23 @@ func (c *Client) call(ctx context.Context, method string, params any, result any
 	}
 	reqBytes = append(reqBytes, '\n')
 
-	if _, err := c.stdin.Write(reqBytes); err != nil {
-		return fmt.Errorf("plugin write: %w", err)
+	writeCh := make(chan error, 1)
+	go func() {
+		_, err := c.stdin.Write(reqBytes)
+		if err != nil {
+			writeCh <- fmt.Errorf("plugin write: %w", err)
+			return
+		}
+		writeCh <- nil
+	}()
+	select {
+	case <-ctx.Done():
+		c.markUnusableLocked()
+		return fmt.Errorf("plugin request timed out while writing: %w", ctx.Err())
+	case err := <-writeCh:
+		if err != nil {
+			return err
+		}
 	}
 
 	// Read response with context timeout.

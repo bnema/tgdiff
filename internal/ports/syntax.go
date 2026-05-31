@@ -1,23 +1,23 @@
 package ports
 
-import syntaxdto "ero/internal/syntax"
+import "ero/internal/core"
 
-type SemanticTokenType = syntaxdto.SemanticTokenType
+type SemanticTokenType = core.SemanticTokenType
 
 const (
-	SemanticTokenKeyword     = syntaxdto.SemanticTokenKeyword
-	SemanticTokenFunction    = syntaxdto.SemanticTokenFunction
-	SemanticTokenTypeName    = syntaxdto.SemanticTokenTypeName
-	SemanticTokenName        = syntaxdto.SemanticTokenName
-	SemanticTokenString      = syntaxdto.SemanticTokenString
-	SemanticTokenNumber      = syntaxdto.SemanticTokenNumber
-	SemanticTokenComment     = syntaxdto.SemanticTokenComment
-	SemanticTokenOperator    = syntaxdto.SemanticTokenOperator
-	SemanticTokenPunctuation = syntaxdto.SemanticTokenPunctuation
-	SemanticTokenText        = syntaxdto.SemanticTokenText
+	SemanticTokenKeyword     = core.SemanticTokenKeyword
+	SemanticTokenFunction    = core.SemanticTokenFunction
+	SemanticTokenTypeName    = core.SemanticTokenTypeName
+	SemanticTokenName        = core.SemanticTokenName
+	SemanticTokenString      = core.SemanticTokenString
+	SemanticTokenNumber      = core.SemanticTokenNumber
+	SemanticTokenComment     = core.SemanticTokenComment
+	SemanticTokenOperator    = core.SemanticTokenOperator
+	SemanticTokenPunctuation = core.SemanticTokenPunctuation
+	SemanticTokenText        = core.SemanticTokenText
 )
 
-type SyntaxToken = syntaxdto.Token
+type SyntaxToken = core.SyntaxToken
 
 type SyntaxTokenizer interface {
 	Tokenize(filename string, lines []string) ([][]SyntaxToken, error)

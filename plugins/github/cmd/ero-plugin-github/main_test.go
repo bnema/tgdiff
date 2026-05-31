@@ -30,6 +30,31 @@ func TestPublishReviewRequiresAssociatedPullRequest(t *testing.T) {
 	}
 }
 
+func TestPublishReviewClassifiesGitHubCLIAuthFailure(t *testing.T) {
+	provider := githubProvider{execGH: func(context.Context, ...string) (string, string, error) {
+		return "", "gh auth required", assertAnError{}
+	}}
+	_, err := provider.PublishReview(context.Background(), plugin.PublishReviewParams{})
+	if plugin.AsError(err) == nil || plugin.AsError(err).Code != plugin.ErrorAuthRequired {
+		t.Fatalf("expected auth_required, got %v", err)
+	}
+}
+
+func TestPublishReviewRejectsMalformedGitHubReviewResponse(t *testing.T) {
+	calls := 0
+	provider := githubProvider{execGH: func(context.Context, ...string) (string, string, error) {
+		calls++
+		if calls == 1 {
+			return `{"number": 12, "url": "https://github.com/owner/repo/pull/12"}`, "", nil
+		}
+		return `{`, "", nil
+	}}
+	_, err := provider.PublishReview(context.Background(), plugin.PublishReviewParams{})
+	if plugin.AsError(err) == nil || plugin.AsError(err).Code != plugin.ErrorRemoteValidationFailed {
+		t.Fatalf("expected remote_validation_failed, got %v", err)
+	}
+}
+
 func TestPublishReviewSubmitsGitHubReview(t *testing.T) {
 	var calls [][]string
 	provider := githubProvider{execGH: func(_ context.Context, args ...string) (string, string, error) {
