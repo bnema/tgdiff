@@ -25,7 +25,7 @@ func RenderHelpPane(width, height int, enterKeyLabel, commentSubmitKeyLabel stri
 		renderHelpShortcut("s/space", "select lines", contentWidth),
 		renderHelpShortcut("c", "comment selection", contentWidth),
 		renderHelpShortcut("P", "publish review", contentWidth),
-		renderHelpShortcut("C/R", "clear/copy review", contentWidth),
+		renderHelpShortcut("C/x", "copy/clear review", contentWidth),
 		renderHelpShortcut("y/Y", "copy plain/rich", contentWidth),
 		renderHelpShortcut("q", "quit", contentWidth),
 		"",

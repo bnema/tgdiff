@@ -51,11 +51,11 @@ func ReviewAction(key string) Action {
 		return ActionClearSelection
 	case "c":
 		return ActionOpenComment
-	case "C":
+	case "x":
 		return ActionClearReview
 	case "P":
 		return ActionPublishReview
-	case "R":
+	case "C":
 		return ActionCopyReviewJSON
 	case "y":
 		return ActionCopyPlain

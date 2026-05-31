@@ -100,7 +100,7 @@ func TestModelCopyReviewShortcutCopiesCurrentReviewJSON(t *testing.T) {
 	clipboard.EXPECT().WriteClipboard(mock.Anything, mock.MatchedBy(func(text string) bool {
 		return strings.Contains(text, `"body": "manual copy"`) && strings.Contains(text, `"comments"`)
 	})).Return(nil).Once()
-	updated, cmd := model.Update(keyPress("R"))
+	updated, cmd := model.Update(keyPress("C"))
 	model = updated.(Model)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "Copying review JSON…", model.copyFeedback)
@@ -121,7 +121,7 @@ func TestModelCopyReviewShortcutReportsClipboardFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	clipboard.EXPECT().WriteClipboard(mock.Anything, mock.Anything).Return(assert.AnError).Once()
-	updated, cmd := model.Update(keyPress("R"))
+	updated, cmd := model.Update(keyPress("C"))
 	model = updated.(Model)
 	require.NotNil(t, cmd)
 	updated, _ = model.Update(cmd())
@@ -145,7 +145,7 @@ func TestModelInlineCommentCancelAndClear(t *testing.T) {
 
 	_, err := model.reviewDraft.AddComment(core.ReviewCommentInput{FilePath: "demo.go", Range: core.ReviewLineRange{Start: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, End: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}}, Body: "old"})
 	require.NoError(t, err)
-	updated, _ = model.Update(keyPress("C"))
+	updated, _ = model.Update(keyPress("x"))
 	model = updated.(Model)
 	assert.Empty(t, model.reviewDraft.Comments())
 	assert.Contains(t, model.copyFeedback, "Cleared review")
