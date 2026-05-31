@@ -41,10 +41,14 @@ func TestPublishOverlaySupportsKeyboardFocusAndToggle(t *testing.T) {
 	updated, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	m = updated.(Model)
 	require.Equal(t, 1, m.publish.focused)
-
-	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeySpace})
-	m = updated.(Model)
+	require.False(t, m.publish.selected["github"])
 	require.True(t, m.publish.selected["pi-coding-agent"])
+
+	updated, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyUp})
+	m = updated.(Model)
+	require.Equal(t, 0, m.publish.focused)
+	require.True(t, m.publish.selected["github"])
+	require.False(t, m.publish.selected["pi-coding-agent"])
 
 	view := stripANSI(m.View().Content)
 	require.Contains(t, view, "↑↓/j/k move")

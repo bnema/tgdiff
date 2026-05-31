@@ -165,14 +165,14 @@ func (m Model) reviewGutter(info viewport.GutterContext) string {
 		return "  "
 	}
 	start, end, selected := m.selectedRange()
+	if marker, ok := m.commentRangeGutter(info.Index); ok {
+		return marker
+	}
 	if info.Index == m.cursorRow {
 		return theme.StatusKeyStyle.Render(nerdIconArrowRight + " ")
 	}
 	if selected && info.Index >= start && info.Index <= end {
 		return theme.SelectedExpander.Render("┃ ")
-	}
-	if marker, ok := m.commentRangeGutter(info.Index); ok {
-		return marker
 	}
 	return "  "
 }
@@ -239,7 +239,7 @@ func (m Model) rowHasActiveEditorRange(rowIndex int) bool {
 
 func commentBlockMarker(line core.ReviewLine, lineRange core.ReviewLineRange) string {
 	if reviewLineMatchesRef(line, lineRange.Start) {
-		return inlineCommentIconStyle.Render(nerdIconComment + "╭")
+		return inlineCommentIconStyle.Render("╭ ")
 	}
 	if reviewLineMatchesRef(line, lineRange.End) {
 		return inlineCommentIconStyle.Render("╰ ")

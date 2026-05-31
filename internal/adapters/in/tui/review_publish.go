@@ -200,6 +200,7 @@ func (m *Model) movePublishFocus(delta int) {
 		return
 	}
 	m.publish.focused = (m.publish.focused + delta + len(m.providerInfos)) % len(m.providerInfos)
+	m.selectOnlyPublishProvider(m.publish.focused)
 }
 
 func (m *Model) toggleFocusedPublishProvider() {
@@ -207,14 +208,14 @@ func (m *Model) toggleFocusedPublishProvider() {
 }
 
 func (m *Model) togglePublishProvider(idx int) {
+	m.selectOnlyPublishProvider(idx)
+}
+
+func (m *Model) selectOnlyPublishProvider(idx int) {
 	if m.publish.publishing || idx < 0 || idx >= len(m.providerInfos) {
 		return
 	}
-	if m.publish.selected == nil {
-		m.publish.selected = map[string]bool{}
-	}
-	id := m.providerInfos[idx].ID
-	m.publish.selected[id] = !m.publish.selected[id]
+	m.publish.selected = map[string]bool{m.providerInfos[idx].ID: true}
 }
 
 func firstPublishableProviderIndex(infos []core.ReviewProviderInfo) int {
