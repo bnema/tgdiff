@@ -15,41 +15,6 @@ import (
 	"ero/internal/ports"
 )
 
-// ---------- result types ----------
-
-// InstallResult describes the outcome of a plugin install.
-type InstallResult struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
-	Path    string `json:"path"`
-}
-
-// InstalledPlugin represents a plugin discovered from config.
-type InstalledPlugin struct {
-	Name          string   `json:"name"`
-	Version       string   `json:"version"`
-	Source        string   `json:"source"`
-	Path          string   `json:"path"`
-	Contributions []string `json:"contributions"` // "type:id" strings
-}
-
-// UpdateResult describes the outcome of a plugin update.
-type UpdateResult struct {
-	Source      string `json:"source"`
-	Name        string `json:"name"`
-	PreviousRef string `json:"previous_ref,omitempty"`
-	UpdatedRef  string `json:"updated_ref,omitempty"`
-	Message     string `json:"message,omitempty"`
-}
-
-// RemoveResult describes the outcome of a plugin removal.
-type RemoveResult struct {
-	Name        string `json:"name"`
-	Source      string `json:"source"`
-	RemovedRepo bool   `json:"removed_repo"`
-}
-
 // ---------- config model ----------
 
 type pluginConfig struct {
@@ -88,10 +53,10 @@ func newManager(configDir, dataDir, gitCommand string) *Manager {
 }
 
 // Install clones or registers a plugin from source.
-func (m *Manager) Install(ctx context.Context, rawSource string) (InstallResult, error) {
+func (m *Manager) Install(ctx context.Context, rawSource string) (ports.PluginInstallResult, error) {
 	source, err := ParseSource(rawSource)
 	if err != nil {
-		return InstallResult{}, err
+		return ports.PluginInstallResult{}, err
 	}
 
 	switch source.Type {
@@ -100,19 +65,19 @@ func (m *Manager) Install(ctx context.Context, rawSource string) (InstallResult,
 	case SourceTypeLocal:
 		return m.installLocal(source)
 	default:
-		return InstallResult{}, fmt.Errorf("unsupported source type: %s", source.Type)
+		return ports.PluginInstallResult{}, fmt.Errorf("unsupported source type: %s", source.Type)
 	}
 }
 
 // List returns all installed plugins by reading the config and loading
 // manifests from each plugin directory.
-func (m *Manager) List(ctx context.Context) ([]InstalledPlugin, error) {
+func (m *Manager) List(ctx context.Context) ([]ports.InstalledPlugin, error) {
 	entries, err := m.loadConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	var plugins []InstalledPlugin
+	var plugins []ports.InstalledPlugin
 	for _, entry := range entries.Plugins {
 		source, err := ParseSource(entry.Source)
 		if err != nil {
@@ -123,7 +88,7 @@ func (m *Manager) List(ctx context.Context) ([]InstalledPlugin, error) {
 		manifest, err := LoadManifest(pluginDir)
 		if err != nil {
 			// Plugin dir exists but manifest is broken — still list it.
-			plugins = append(plugins, InstalledPlugin{
+			plugins = append(plugins, ports.InstalledPlugin{
 				Name:   m.pluginName(source),
 				Source: entry.Source,
 				Path:   pluginDir,
@@ -136,7 +101,7 @@ func (m *Manager) List(ctx context.Context) ([]InstalledPlugin, error) {
 			contributions[i] = c.Type + ":" + c.ID
 		}
 
-		plugins = append(plugins, InstalledPlugin{
+		plugins = append(plugins, ports.InstalledPlugin{
 			Name:          manifest.Name,
 			Version:       manifest.Version,
 			Source:        entry.Source,
@@ -176,13 +141,13 @@ func (m *Manager) InstalledPlugins(ctx context.Context) ([]ports.PluginDescripto
 
 // Update fetches and resets non-pinned plugins to the latest upstream.
 // Pinned plugins are reported as skipped.
-func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult, error) {
+func (m *Manager) Update(ctx context.Context, rawSource string) ([]ports.PluginUpdateResult, error) {
 	entries, err := m.loadConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	var results []UpdateResult
+	var results []ports.PluginUpdateResult
 	for _, entry := range entries.Plugins {
 		if rawSource != "" && entry.Source != rawSource {
 			continue
@@ -190,7 +155,7 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult,
 
 		source, err := ParseSource(entry.Source)
 		if err != nil {
-			results = append(results, UpdateResult{
+			results = append(results, ports.PluginUpdateResult{
 				Source:  entry.Source,
 				Message: fmt.Sprintf("parse error: %v", err),
 			})
@@ -198,7 +163,7 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult,
 		}
 
 		if source.Type != SourceTypeGit {
-			results = append(results, UpdateResult{
+			results = append(results, ports.PluginUpdateResult{
 				Source:  entry.Source,
 				Name:    m.pluginName(source),
 				Message: "local sources are not updated automatically",
@@ -207,7 +172,7 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult,
 		}
 
 		if source.Pinned {
-			results = append(results, UpdateResult{
+			results = append(results, ports.PluginUpdateResult{
 				Source:  entry.Source,
 				Name:    m.pluginName(source),
 				Message: fmt.Sprintf("pinned to %s, skipping update", source.Ref),
@@ -218,7 +183,7 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult,
 		pluginDir := m.pluginDir(source)
 		previousRef, err := m.currentRef(pluginDir)
 		if err != nil {
-			results = append(results, UpdateResult{
+			results = append(results, ports.PluginUpdateResult{
 				Source:  entry.Source,
 				Name:    m.pluginName(source),
 				Message: fmt.Sprintf("could not read current ref: %v", err),
@@ -227,7 +192,7 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult,
 		}
 
 		if err := m.fetchAndReset(ctx, pluginDir); err != nil {
-			results = append(results, UpdateResult{
+			results = append(results, ports.PluginUpdateResult{
 				Source:  entry.Source,
 				Name:    m.pluginName(source),
 				Message: fmt.Sprintf("update failed: %v", err),
@@ -236,7 +201,7 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult,
 		}
 
 		updatedRef, _ := m.currentRef(pluginDir)
-		results = append(results, UpdateResult{
+		results = append(results, ports.PluginUpdateResult{
 			Source:      entry.Source,
 			Name:        source.Path,
 			PreviousRef: previousRef,
@@ -249,10 +214,10 @@ func (m *Manager) Update(ctx context.Context, rawSource string) ([]UpdateResult,
 
 // Remove deletes a plugin from config and, for managed git clones, removes
 // the data directory. Local source repos are never deleted.
-func (m *Manager) Remove(ctx context.Context, nameOrSource string) (RemoveResult, error) {
+func (m *Manager) Remove(ctx context.Context, nameOrSource string) (ports.PluginRemoveResult, error) {
 	entries, err := m.loadConfig()
 	if err != nil {
-		return RemoveResult{}, err
+		return ports.PluginRemoveResult{}, err
 	}
 
 	var targetIdx = -1
@@ -271,7 +236,7 @@ func (m *Manager) Remove(ctx context.Context, nameOrSource string) (RemoveResult
 	}
 
 	if targetIdx == -1 {
-		return RemoveResult{}, fmt.Errorf("plugin %q not found in config", nameOrSource)
+		return ports.PluginRemoveResult{}, fmt.Errorf("plugin %q not found in config", nameOrSource)
 	}
 
 	source, _ := ParseSource(targetEntry.Source)
@@ -280,18 +245,18 @@ func (m *Manager) Remove(ctx context.Context, nameOrSource string) (RemoveResult
 	// Remove config entry.
 	entries.Plugins = append(entries.Plugins[:targetIdx], entries.Plugins[targetIdx+1:]...)
 	if err := m.saveConfig(entries); err != nil {
-		return RemoveResult{}, fmt.Errorf("save config: %w", err)
+		return ports.PluginRemoveResult{}, fmt.Errorf("save config: %w", err)
 	}
 
 	removedRepo := false
 	if source.Type == SourceTypeGit {
 		if err := os.RemoveAll(pluginDir); err != nil && !os.IsNotExist(err) {
-			return RemoveResult{}, fmt.Errorf("remove plugin dir: %w", err)
+			return ports.PluginRemoveResult{}, fmt.Errorf("remove plugin dir: %w", err)
 		}
 		removedRepo = true
 	}
 
-	return RemoveResult{
+	return ports.PluginRemoveResult{
 		Name:        m.pluginName(source),
 		Source:      targetEntry.Source,
 		RemovedRepo: removedRepo,
@@ -300,7 +265,7 @@ func (m *Manager) Remove(ctx context.Context, nameOrSource string) (RemoveResult
 
 // ---------- internal helpers ----------
 
-func (m *Manager) installGit(ctx context.Context, source Source) (InstallResult, error) {
+func (m *Manager) installGit(ctx context.Context, source Source) (ports.PluginInstallResult, error) {
 	pluginDir := m.pluginDir(source)
 
 	// Build clone URL from source.
@@ -308,20 +273,20 @@ func (m *Manager) installGit(ctx context.Context, source Source) (InstallResult,
 
 	// Check if already installed.
 	if _, err := os.Stat(filepath.Join(pluginDir, ".git")); err == nil {
-		return InstallResult{}, fmt.Errorf("plugin %q is already installed at %s", source.Repo, pluginDir)
+		return ports.PluginInstallResult{}, fmt.Errorf("plugin %q is already installed at %s", source.Repo, pluginDir)
 	}
 
 	// Clone.
 	args := []string{"clone", cloneURL, pluginDir}
 	if err := m.runGit(ctx, "", args...); err != nil {
-		return InstallResult{}, fmt.Errorf("clone %s: %w", source.Repo, err)
+		return ports.PluginInstallResult{}, fmt.Errorf("clone %s: %w", source.Repo, err)
 	}
 
 	// Checkout pinned ref.
 	if source.Pinned {
 		if err := m.runGit(ctx, pluginDir, "checkout", source.Ref); err != nil {
 			_ = os.RemoveAll(pluginDir)
-			return InstallResult{}, fmt.Errorf("checkout ref %q: %w", source.Ref, err)
+			return ports.PluginInstallResult{}, fmt.Errorf("checkout ref %q: %w", source.Ref, err)
 		}
 	}
 
@@ -330,16 +295,16 @@ func (m *Manager) installGit(ctx context.Context, source Source) (InstallResult,
 	if err != nil {
 		// Clean up on manifest failure.
 		_ = os.RemoveAll(pluginDir)
-		return InstallResult{}, fmt.Errorf("%s: invalid manifest: %w", source.Repo, err)
+		return ports.PluginInstallResult{}, fmt.Errorf("%s: invalid manifest: %w", source.Repo, err)
 	}
 
 	// Write config entry.
 	if err := m.addConfigEntry(source); err != nil {
 		_ = os.RemoveAll(pluginDir)
-		return InstallResult{}, err
+		return ports.PluginInstallResult{}, err
 	}
 
-	return InstallResult{
+	return ports.PluginInstallResult{
 		Name:    manifest.Name,
 		Version: manifest.Version,
 		Source:  sourceConfigString(source),
@@ -347,17 +312,17 @@ func (m *Manager) installGit(ctx context.Context, source Source) (InstallResult,
 	}, nil
 }
 
-func (m *Manager) installLocal(source Source) (InstallResult, error) {
+func (m *Manager) installLocal(source Source) (ports.PluginInstallResult, error) {
 	manifest, err := LoadManifest(source.LocalPath)
 	if err != nil {
-		return InstallResult{}, err
+		return ports.PluginInstallResult{}, err
 	}
 
 	if err := m.addConfigEntry(source); err != nil {
-		return InstallResult{}, err
+		return ports.PluginInstallResult{}, err
 	}
 
-	return InstallResult{
+	return ports.PluginInstallResult{
 		Name:    manifest.Name,
 		Version: manifest.Version,
 		Source:  sourceConfigString(source),

@@ -8,17 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"ero/internal/adapters/in/tui/component"
-	pluginadapter "ero/internal/adapters/out/plugin"
+	"ero/internal/adapters/in/cli/render"
+	"ero/internal/ports"
 )
 
-// PluginManager is the interface the CLI needs from the plugin adapter.
-type PluginManager interface {
-	Install(ctx context.Context, source string) (pluginadapter.InstallResult, error)
-	List(ctx context.Context) ([]pluginadapter.InstalledPlugin, error)
-	Update(ctx context.Context, source string) ([]pluginadapter.UpdateResult, error)
-	Remove(ctx context.Context, nameOrSource string) (pluginadapter.RemoveResult, error)
-}
+// PluginManager is the interface the CLI needs from the application boundary.
+type PluginManager = ports.PluginLifecycle
 
 // NewPluginCommand creates the "plugin" parent command with list, install,
 // update, and remove subcommands. Each supports --json for machine-readable
@@ -69,8 +64,7 @@ func newPluginListCommand(manager PluginManager, out io.Writer, jsonOutput *bool
 				return enc.Encode(plugins)
 			}
 
-			renderPluginList(writer, plugins)
-			return nil
+			return renderPluginList(writer, plugins)
 		},
 	}
 }
@@ -98,10 +92,8 @@ func newPluginInstallCommand(manager PluginManager, out io.Writer, jsonOutput *b
 				return enc.Encode(result)
 			}
 
-			fmt.Fprintf(writer, "Installed plugin %s v%s\n", result.Name, result.Version)
-			fmt.Fprintf(writer, "  Source: %s\n", result.Source)
-			fmt.Fprintf(writer, "  Path:   %s\n", result.Path)
-			return nil
+			_, err = fmt.Fprintln(writer, render.PluginInstall(result))
+			return err
 		},
 	}
 }
@@ -139,14 +131,8 @@ are reported as skipped.`,
 				return enc.Encode(results)
 			}
 
-			for _, r := range results {
-				if r.Message != "" {
-					fmt.Fprintf(writer, "%s: %s\n", r.Name, r.Message)
-				} else {
-					fmt.Fprintf(writer, "Updated %s: %s → %s\n", r.Name, shortSHA(r.PreviousRef), shortSHA(r.UpdatedRef))
-				}
-			}
-			return nil
+			_, err = fmt.Fprintln(writer, render.PluginUpdates(results))
+			return err
 		},
 	}
 }
@@ -174,12 +160,8 @@ func newPluginRemoveCommand(manager PluginManager, out io.Writer, jsonOutput *bo
 				return enc.Encode(result)
 			}
 
-			action := "Removed plugin reference"
-			if result.RemovedRepo {
-				action = "Removed plugin"
-			}
-			fmt.Fprintf(writer, "%s %s\n", action, result.Name)
-			return nil
+			_, err = fmt.Fprintln(writer, render.PluginRemove(result))
+			return err
 		},
 	}
 }
@@ -192,22 +174,7 @@ func commandOut(cmd *cobra.Command, configured io.Writer) io.Writer {
 }
 
 // renderPluginList writes a human-readable table of installed plugins.
-func renderPluginList(out io.Writer, plugins []pluginadapter.InstalledPlugin) {
-	items := make([]component.PluginListItem, 0, len(plugins))
-	for _, p := range plugins {
-		items = append(items, component.PluginListItem{
-			Name:          p.Name,
-			Version:       p.Version,
-			Source:        p.Source,
-			Contributions: p.Contributions,
-		})
-	}
-	fmt.Fprintln(out, component.RenderPluginList(items, 100))
-}
-
-func shortSHA(sha string) string {
-	if len(sha) > 7 {
-		return sha[:7]
-	}
-	return sha
+func renderPluginList(out io.Writer, plugins []ports.InstalledPlugin) error {
+	_, err := fmt.Fprintln(out, render.PluginList(plugins, 100))
+	return err
 }

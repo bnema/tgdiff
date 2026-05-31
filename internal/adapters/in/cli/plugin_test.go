@@ -2,54 +2,28 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	pluginadapter "ero/internal/adapters/out/plugin"
+	"ero/internal/ports"
+	"ero/internal/ports/mocks"
 )
-
-// fakePluginManager implements PluginManager for CLI tests.
-type fakePluginManager struct {
-	plugins       []pluginadapter.InstalledPlugin
-	installResult pluginadapter.InstallResult
-	installErr    error
-	removeResult  pluginadapter.RemoveResult
-	removeErr     error
-	updateResults []pluginadapter.UpdateResult
-	updateErr     error
-}
-
-func (f *fakePluginManager) Install(_ context.Context, _ string) (pluginadapter.InstallResult, error) {
-	return f.installResult, f.installErr
-}
-
-func (f *fakePluginManager) List(_ context.Context) ([]pluginadapter.InstalledPlugin, error) {
-	return f.plugins, nil
-}
-
-func (f *fakePluginManager) Update(_ context.Context, source string) ([]pluginadapter.UpdateResult, error) {
-	return f.updateResults, f.updateErr
-}
-
-func (f *fakePluginManager) Remove(_ context.Context, nameOrSource string) (pluginadapter.RemoveResult, error) {
-	return f.removeResult, f.removeErr
-}
 
 func TestPluginCommandRegisteredUnderParent(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{}
-	cmd := NewPluginCommand(fake, nil)
+	manager := mocks.NewMockPluginLifecycle(t)
+	cmd := NewPluginCommand(manager, nil)
 	require.NotNil(t, cmd)
 
 	assert.Equal(t, "plugin", cmd.Use)
 
-	// List subcommand.
 	listCmd, _, err := cmd.Find([]string{"list"})
 	require.NoError(t, err)
 	assert.Equal(t, "list", listCmd.Use)
@@ -59,8 +33,9 @@ func TestPluginCommandRegisteredUnderParent(t *testing.T) {
 func TestPluginListEmpty(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{}
-	cmd := NewPluginCommand(fake, nil)
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().List(mock.Anything).Return(nil, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -74,26 +49,26 @@ func TestPluginListEmpty(t *testing.T) {
 func TestPluginListHumanOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		plugins: []pluginadapter.InstalledPlugin{
-			{
-				Name:          "github",
-				Version:       "0.1.0",
-				Source:        "git:github.com/ero-plugins/github@v0.1.0",
-				Path:          "/data/plugins/github",
-				Contributions: []string{"review_provider:github"},
-			},
-			{
-				Name:          "pi-coding-agent",
-				Version:       "0.2.0",
-				Source:        "/home/user/dev/ero-plugin-pi-coding-agent",
-				Path:          "/home/user/dev/ero-plugin-pi-coding-agent",
-				Contributions: []string{"review_provider:pi-coding-agent"},
-			},
+	plugins := []ports.InstalledPlugin{
+		{
+			Name:          "github",
+			Version:       "0.1.0",
+			Source:        "git:github.com/ero-plugins/github@v0.1.0",
+			Path:          "/data/plugins/github",
+			Contributions: []string{"review_provider:github"},
+		},
+		{
+			Name:          "pi-coding-agent",
+			Version:       "0.2.0",
+			Source:        "/home/user/dev/ero-plugin-pi-coding-agent",
+			Path:          "/home/user/dev/ero-plugin-pi-coding-agent",
+			Contributions: []string{"review_provider:pi-coding-agent"},
 		},
 	}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().List(mock.Anything).Return(plugins, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -112,13 +87,11 @@ func TestPluginListHumanOutput(t *testing.T) {
 func TestPluginListJSONOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		plugins: []pluginadapter.InstalledPlugin{
-			{Name: "github", Version: "0.1.0", Source: "git:github.com/ero-plugins/github@v0.1.0", Contributions: []string{"review_provider:github"}},
-		},
-	}
+	plugins := []ports.InstalledPlugin{{Name: "github", Version: "0.1.0", Source: "git:github.com/ero-plugins/github@v0.1.0", Contributions: []string{"review_provider:github"}}}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().List(mock.Anything).Return(plugins, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -127,7 +100,7 @@ func TestPluginListJSONOutput(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	var result []pluginadapter.InstalledPlugin
+	var result []ports.InstalledPlugin
 	err = json.Unmarshal(out.Bytes(), &result)
 	require.NoError(t, err)
 
@@ -139,16 +112,11 @@ func TestPluginListJSONOutput(t *testing.T) {
 func TestPluginInstallHumanOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		installResult: pluginadapter.InstallResult{
-			Name:    "github",
-			Version: "0.1.0",
-			Source:  "git:github.com/ero-plugins/github@v0.1.0",
-			Path:    "/data/plugins/github",
-		},
-	}
+	result := ports.PluginInstallResult{Name: "github", Version: "0.1.0", Source: "git:github.com/ero-plugins/github@v0.1.0", Path: "/data/plugins/github"}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().Install(mock.Anything, "git:github.com/ero-plugins/github@v0.1.0").Return(result, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -157,7 +125,7 @@ func TestPluginInstallHumanOutput(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	output := out.String()
+	output := stripANSI(out.String())
 	assert.Contains(t, output, "Installed plugin github v0.1.0")
 	assert.Contains(t, output, "git:github.com/ero-plugins/github@v0.1.0")
 }
@@ -165,13 +133,11 @@ func TestPluginInstallHumanOutput(t *testing.T) {
 func TestPluginInstallJSONOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		installResult: pluginadapter.InstallResult{
-			Name: "github", Version: "0.1.0", Source: "git:github.com/ero-plugins/github@v0.1.0", Path: "/data/plugins/github",
-		},
-	}
+	result := ports.PluginInstallResult{Name: "github", Version: "0.1.0", Source: "git:github.com/ero-plugins/github@v0.1.0", Path: "/data/plugins/github"}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().Install(mock.Anything, "git:github.com/ero-plugins/github@v0.1.0").Return(result, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -180,18 +146,18 @@ func TestPluginInstallJSONOutput(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	var result pluginadapter.InstallResult
-	err = json.Unmarshal(out.Bytes(), &result)
+	var decoded ports.PluginInstallResult
+	err = json.Unmarshal(out.Bytes(), &decoded)
 	require.NoError(t, err)
-	assert.Equal(t, "github", result.Name)
-	assert.Equal(t, "0.1.0", result.Version)
+	assert.Equal(t, "github", decoded.Name)
+	assert.Equal(t, "0.1.0", decoded.Version)
 }
 
 func TestPluginInstallMissingArgs(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{}
-	cmd := NewPluginCommand(fake, nil)
+	manager := mocks.NewMockPluginLifecycle(t)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -204,14 +170,14 @@ func TestPluginInstallMissingArgs(t *testing.T) {
 func TestPluginUpdateHumanOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		updateResults: []pluginadapter.UpdateResult{
-			{Name: "github", PreviousRef: "abc1234def", UpdatedRef: "xyz5678abc"},
-			{Name: "pi-coding-agent", Message: "pinned to v0.1.0, skipping update"},
-		},
+	results := []ports.PluginUpdateResult{
+		{Name: "github", PreviousRef: "abc1234def", UpdatedRef: "xyz5678abc"},
+		{Name: "pi-coding-agent", Message: "pinned to v0.1.0, skipping update"},
 	}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().Update(mock.Anything, "").Return(results, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -220,21 +186,19 @@ func TestPluginUpdateHumanOutput(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	output := out.String()
-	assert.Contains(t, output, "github: abc1234 → xyz5678")
-	assert.Contains(t, output, "pi-coding-agent: pinned")
+	output := stripANSI(out.String())
+	assert.Contains(t, output, "github abc1234 → xyz5678")
+	assert.Contains(t, output, "pi-coding-agent — pinned")
 }
 
 func TestPluginUpdateJSONOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		updateResults: []pluginadapter.UpdateResult{
-			{Name: "github", PreviousRef: "abc1234def", UpdatedRef: "xyz5678abc"},
-		},
-	}
+	results := []ports.PluginUpdateResult{{Name: "github", PreviousRef: "abc1234def", UpdatedRef: "xyz5678abc"}}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().Update(mock.Anything, "").Return(results, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -243,25 +207,21 @@ func TestPluginUpdateJSONOutput(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	var results []pluginadapter.UpdateResult
-	err = json.Unmarshal(out.Bytes(), &results)
+	var decoded []ports.PluginUpdateResult
+	err = json.Unmarshal(out.Bytes(), &decoded)
 	require.NoError(t, err)
-	require.Len(t, results, 1)
-	assert.Equal(t, "github", results[0].Name)
+	require.Len(t, decoded, 1)
+	assert.Equal(t, "github", decoded[0].Name)
 }
 
 func TestPluginRemoveHumanOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		removeResult: pluginadapter.RemoveResult{
-			Name:        "github",
-			Source:      "git:github.com/ero-plugins/github@v0.1.0",
-			RemovedRepo: true,
-		},
-	}
+	result := ports.PluginRemoveResult{Name: "github", Source: "git:github.com/ero-plugins/github@v0.1.0", RemovedRepo: true}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().Remove(mock.Anything, "github").Return(result, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -269,19 +229,17 @@ func TestPluginRemoveHumanOutput(t *testing.T) {
 
 	err := cmd.Execute()
 	require.NoError(t, err)
-	assert.Contains(t, out.String(), "Removed plugin github")
+	assert.Contains(t, stripANSI(out.String()), "Removed plugin github")
 }
 
 func TestPluginRemoveJSONOutput(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		removeResult: pluginadapter.RemoveResult{
-			Name: "github", Source: "git:github.com/ero-plugins/github@v0.1.0", RemovedRepo: false,
-		},
-	}
+	result := ports.PluginRemoveResult{Name: "github", Source: "git:github.com/ero-plugins/github@v0.1.0", RemovedRepo: false}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().Remove(mock.Anything, "github").Return(result, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -290,23 +248,21 @@ func TestPluginRemoveJSONOutput(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	var result pluginadapter.RemoveResult
-	err = json.Unmarshal(out.Bytes(), &result)
+	var decoded ports.PluginRemoveResult
+	err = json.Unmarshal(out.Bytes(), &decoded)
 	require.NoError(t, err)
-	assert.Equal(t, "github", result.Name)
-	assert.False(t, result.RemovedRepo)
+	assert.Equal(t, "github", decoded.Name)
+	assert.False(t, decoded.RemovedRepo)
 }
 
 func TestPluginUpdateFiltered(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		updateResults: []pluginadapter.UpdateResult{
-			{Name: "github", PreviousRef: "abc", UpdatedRef: "def"},
-		},
-	}
+	results := []ports.PluginUpdateResult{{Name: "github", PreviousRef: "abc", UpdatedRef: "def"}}
+	manager := mocks.NewMockPluginLifecycle(t)
+	manager.EXPECT().Update(mock.Anything, "git:github.com/ero-plugins/github").Return(results, nil)
 
-	cmd := NewPluginCommand(fake, nil)
+	cmd := NewPluginCommand(manager, nil)
 
 	var out bytes.Buffer
 	cmd.SetOut(&out)
@@ -314,29 +270,26 @@ func TestPluginUpdateFiltered(t *testing.T) {
 
 	err := cmd.Execute()
 	require.NoError(t, err)
-	assert.Contains(t, out.String(), "github")
+	assert.Contains(t, stripANSI(out.String()), "github")
+}
+
+func stripANSI(s string) string {
+	return regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAllString(s, "")
 }
 
 func TestPluginCommandWiresContext(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakePluginManager{
-		plugins: []pluginadapter.InstalledPlugin{
-			{Name: "test", Version: "0.1.0"},
-		},
-	}
-
-	cmd := NewPluginCommand(fake, nil)
+	manager := mocks.NewMockPluginLifecycle(t)
+	cmd := NewPluginCommand(manager, nil)
 	require.NotNil(t, cmd)
 
-	// Verify subcommand count.
 	assert.Len(t, cmd.Commands(), 4)
 	names := make([]string, len(cmd.Commands()))
 	for i, c := range cmd.Commands() {
 		names[i] = c.Use
 	}
 
-	// All expected subcommands should be present.
 	for _, name := range []string{"list", "install", "update", "remove"} {
 		found := false
 		for _, n := range names {

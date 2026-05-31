@@ -103,7 +103,8 @@ func newAppWithClipboard(cfg *viper.Viper, loader reviewLoader, runner tuiRunner
 		log.Info().Int("files", len(files)).Msg("review loaded")
 		var reviewProviders []ports.ReviewProviderClient
 		pluginManager := pluginadapter.NewManager()
-		if providers, err := buildReviewProviders(pluginManager); err == nil {
+		providerLoader := pluginadapter.NewReviewProviderLoader(pluginManager)
+		if providers, err := buildReviewProviders(ctx, providerLoader); err == nil {
 			reviewProviders = providers
 		}
 		var metadata ports.GitMetadataReader

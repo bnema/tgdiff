@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -247,44 +246,17 @@ func TestRunLoadsReviewAndRunsTUIWithConfig(t *testing.T) {
 	}
 }
 
-func TestBuildReviewProvidersStartsOneClientPerReviewProviderContribution(t *testing.T) {
+func TestBuildReviewProvidersDelegatesToLoader(t *testing.T) {
 	t.Parallel()
 
-	dir := t.TempDir()
-	err := os.WriteFile(dir+"/ero-plugin.toml", []byte(`name = "multi"
-version = "0.1.0"
-manifest_version = "1"
-protocol = "ero.plugin.v1"
+	ctx := context.Background()
+	provider := mocks.NewMockReviewProviderClient(t)
+	loader := mocks.NewMockReviewProviderLoader(t)
+	loader.EXPECT().LoadReviewProviders(ctx).Return([]ports.ReviewProviderClient{provider}, nil)
 
-[runtime]
-command = "cat"
-
-[[contributions]]
-type = "review_provider"
-id = "github"
-label = "GitHub"
-
-[[contributions]]
-type = "review_provider"
-id = "gitlab"
-label = "GitLab"
-`), 0o644)
+	providers, err := buildReviewProviders(ctx, loader)
 	require.NoError(t, err)
-
-	providers, err := buildReviewProviders(fakePluginRegistry{descriptors: []ports.PluginDescriptor{{
-		Name: "multi",
-		Path: dir,
-		Contributions: []ports.PluginContribution{
-			{Type: "review_provider", ID: "github", Label: "GitHub"},
-			{Type: "review_provider", ID: "gitlab", Label: "GitLab"},
-			{Type: "other", ID: "ignored", Label: "Ignored"},
-		},
-	}}})
-	require.NoError(t, err)
-	require.Len(t, providers, 2)
-	for _, provider := range providers {
-		require.NoError(t, provider.Close())
-	}
+	require.Equal(t, []ports.ReviewProviderClient{provider}, providers)
 }
 
 func TestBuildReviewContext(t *testing.T) {
@@ -341,15 +313,6 @@ func minimalReviewFiles() []core.ReviewFile {
 			Lines: []core.ReviewLine{{NewLineNumber: 1, Content: "package main", Kind: core.LineKindAdded}},
 		}},
 	}}
-}
-
-type fakePluginRegistry struct {
-	descriptors []ports.PluginDescriptor
-	err         error
-}
-
-func (f fakePluginRegistry) InstalledPlugins(context.Context) ([]ports.PluginDescriptor, error) {
-	return f.descriptors, f.err
 }
 
 type fakeGitMetadataReader struct {
