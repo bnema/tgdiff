@@ -1,6 +1,8 @@
 # Plugins
 
-Ero plugins are local subprocesses that extend review publication and remote review loading. The current public contribution type is `review_provider`.
+Ero plugins are a general extension mechanism based on local subprocesses. A plugin declares one or more contributions in its manifest; future contribution types can extend other parts of Ero, such as themes or additional workflows.
+
+This first release ships the `review_provider` contribution type, which lets plugins publish reviews and load remote review comments.
 
 ## Install and manage plugins
 
@@ -44,7 +46,7 @@ id = "example"
 label = "Example"
 ```
 
-Required fields are `name`, `version`, `manifest_version = "1"`, `protocol = "ero.plugin.v1"`, `runtime.command`, and at least one contribution with `type` and `id`. Contribution type strings are lower snake_case; the first-release type is `review_provider`.
+Required fields are `name`, `version`, `manifest_version = "1"`, `protocol = "ero.plugin.v1"`, `runtime.command`, and at least one contribution with `type` and `id`. Contribution type strings are lower snake_case; the currently implemented public contribution type is `review_provider`.
 
 `runtime.command` is executed with the plugin root as the working directory. Keep it stable for installed users; use the optional `build.command` for local development or release packaging.
 

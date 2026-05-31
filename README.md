@@ -44,7 +44,7 @@ ero --context-lines 5
 
 ## Plugins
 
-Ero supports review provider plugins managed with `ero plugin install`, `ero plugin list`, `ero plugin update`, and `ero plugin remove`. The maintained GitHub plugin requires the GitHub CLI (`gh`) installed and authenticated with `gh auth login`. See [docs/plugins.md](docs/plugins.md) for authoring details and the GitHub/pi-coding-agent maintained plugins.
+Ero supports a general local subprocess plugin system, managed with `ero plugin install`, `ero plugin list`, `ero plugin update`, and `ero plugin remove`. The first shipped contribution type is `review_provider`, used by the maintained GitHub and pi-coding-agent plugins. The GitHub plugin requires the GitHub CLI (`gh`) installed and authenticated with `gh auth login`. See [docs/plugins.md](docs/plugins.md) for authoring details.
 
 ## Development
 
