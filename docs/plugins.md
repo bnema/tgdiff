@@ -115,7 +115,7 @@ Do not put secrets in `ero-plugin.toml`, command-line arguments, or stdout. Read
 
 Ero ships maintained plugin implementations under `plugins/`:
 
-- `plugins/github`: GitHub review provider. It requires the GitHub CLI (`gh`) installed and authenticated with `gh auth login`; the plugin uses `go-gh`/`gh` for GitHub auth and PR lookup. Publishing returns a fast error when the current branch has no associated pull request. Full GitHub review submission is not implemented yet.
+- `plugins/github`: GitHub review provider. It requires the GitHub CLI (`gh`) installed and authenticated with `gh auth login`; the plugin uses `go-gh`/`gh` for GitHub auth, current-branch PR lookup, and PR review submission. Publishing returns a fast error when the current branch has no associated pull request.
 - `plugins/pi-coding-agent`: pi-coding-agent destination. Load its Pi extension, then Ero can publish a review into the matching Pi session as a user message.
 
 Build them with:
