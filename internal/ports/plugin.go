@@ -1,0 +1,84 @@
+package ports
+
+import (
+	"context"
+
+	"ero/internal/core"
+)
+
+// PluginLifecycle manages installed plugins for CLI/application entrypoints.
+type PluginLifecycle interface {
+	Install(ctx context.Context, source string) (PluginInstallResult, error)
+	List(ctx context.Context) ([]InstalledPlugin, error)
+	Update(ctx context.Context, source string) ([]PluginUpdateResult, error)
+	Remove(ctx context.Context, nameOrSource string) (PluginRemoveResult, error)
+}
+
+// PluginRegistry discovers installed plugins and their contributions.
+type PluginRegistry interface {
+	InstalledPlugins(ctx context.Context) ([]PluginDescriptor, error)
+}
+
+// PluginInstallResult describes the outcome of a plugin install.
+type PluginInstallResult struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
+	Path    string `json:"path"`
+}
+
+// InstalledPlugin represents a plugin discovered from config.
+type InstalledPlugin struct {
+	Name          string   `json:"name"`
+	Version       string   `json:"version"`
+	Source        string   `json:"source"`
+	Path          string   `json:"path"`
+	Contributions []string `json:"contributions"`
+}
+
+// PluginUpdateResult describes the outcome of a plugin update.
+type PluginUpdateResult struct {
+	Source      string `json:"source"`
+	Name        string `json:"name"`
+	PreviousRef string `json:"previous_ref,omitempty"`
+	UpdatedRef  string `json:"updated_ref,omitempty"`
+	Message     string `json:"message,omitempty"`
+}
+
+// PluginRemoveResult describes the outcome of a plugin removal.
+type PluginRemoveResult struct {
+	Name        string `json:"name"`
+	Source      string `json:"source"`
+	RemovedRepo bool   `json:"removed_repo"`
+}
+
+// ReviewProviderLoader builds provider clients from installed plugin sources.
+type ReviewProviderLoader interface {
+	LoadReviewProviders(ctx context.Context) ([]ReviewProviderClient, error)
+}
+
+// PluginDescriptor holds static metadata about an installed plugin.
+type PluginDescriptor struct {
+	Name          string
+	Version       string
+	Source        string
+	Path          string
+	Contributions []PluginContribution
+}
+
+// PluginContribution describes a single capability that a plugin provides.
+type PluginContribution struct {
+	Type  string
+	ID    string
+	Label string
+}
+
+// ReviewProviderClient is the interface the app/TUI uses to interact with a
+// single review provider instance. It is implemented by plugin adapters.
+type ReviewProviderClient interface {
+	Initialize(ctx context.Context) (core.ReviewProviderInfo, error)
+	DetectContext(ctx context.Context, review core.ReviewContext) (core.DetectionResult, error)
+	LoadRemoteThreads(ctx context.Context, review core.ReviewContext) ([]core.RemoteReviewThread, error)
+	PublishReview(ctx context.Context, request core.PublishReviewRequest) (core.PublishReviewResult, error)
+	Close() error
+}

@@ -146,8 +146,8 @@ func (_c *MockSyntaxTokenizer_Tokenize_Call) Run(run func(filename string, lines
 	return _c
 }
 
-func (_c *MockSyntaxTokenizer_Tokenize_Call) Return(syntaxTokenss [][]ports.SyntaxToken, err error) *MockSyntaxTokenizer_Tokenize_Call {
-	_c.Call.Return(syntaxTokenss, err)
+func (_c *MockSyntaxTokenizer_Tokenize_Call) Return(vss [][]ports.SyntaxToken, err error) *MockSyntaxTokenizer_Tokenize_Call {
+	_c.Call.Return(vss, err)
 	return _c
 }
 

@@ -13,6 +13,23 @@ import (
 	"ero/internal/ports/mocks"
 )
 
+func TestModelOpenCommentEditorUsesSelectedLineRange(t *testing.T) {
+	model := NewModel([]core.ReviewFile{reviewFileWithLines("demo.go", 3)})
+	updated, _ := model.Update(keyPress("s"))
+	model = updated.(Model)
+	updated, _ = model.Update(keyPress("j"))
+	model = updated.(Model)
+	updated, _ = model.Update(keyPress("j"))
+	model = updated.(Model)
+
+	updated, _ = model.Update(keyPress("c"))
+	model = updated.(Model)
+
+	require.NotNil(t, model.commentEditor)
+	require.Equal(t, core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, model.commentEditor.Range.Start)
+	require.Equal(t, core.ReviewLineRef{NewLineNumber: 3, Kind: core.LineKindAdded}, model.commentEditor.Range.End)
+}
+
 func TestModelInlineCommentSubmitCopiesReviewJSON(t *testing.T) {
 	t.Parallel()
 
@@ -50,6 +67,28 @@ func TestModelInlineCommentSubmitCopiesReviewJSON(t *testing.T) {
 	assert.Contains(t, stripANSI(model.View().Content), "review note")
 }
 
+func TestModelInlineCommentSubmitWithProviderDoesNotCopyReviewJSON(t *testing.T) {
+	clipboard := mocks.NewMockClipboardWriter(t)
+	model := NewModelWithClipboardWriter([]core.ReviewFile{reviewFileWithLines("demo.go", 1)}, nil, nil, core.ReviewRequest{DiffMode: core.DiffModeBranch}, clipboard)
+	model.providerInfos = []core.ReviewProviderInfo{{ID: "pi-coding-agent", Label: "pi-coding-agent", Capabilities: core.ReviewProviderCapabilities{PublishReview: true}}}
+
+	updated, _ := model.Update(keyPress("c"))
+	model = updated.(Model)
+	for _, r := range "review note" {
+		updated, _ = model.Update(tea.KeyPressMsg{Text: string(r), Code: r})
+		model = updated.(Model)
+	}
+
+	updated, cmd := model.Update(tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModCtrl})
+	model = updated.(Model)
+
+	require.NotNil(t, cmd)
+	assert.Nil(t, model.commentEditor)
+	assert.Len(t, model.reviewDraft.Comments(), 1)
+	assert.Contains(t, model.copyFeedback, "Comment added; press P to publish")
+	assert.Empty(t, model.lastCopiedText)
+}
+
 func TestModelCopyReviewShortcutCopiesCurrentReviewJSON(t *testing.T) {
 	t.Parallel()
 
@@ -61,7 +100,7 @@ func TestModelCopyReviewShortcutCopiesCurrentReviewJSON(t *testing.T) {
 	clipboard.EXPECT().WriteClipboard(mock.Anything, mock.MatchedBy(func(text string) bool {
 		return strings.Contains(text, `"body": "manual copy"`) && strings.Contains(text, `"comments"`)
 	})).Return(nil).Once()
-	updated, cmd := model.Update(keyPress("R"))
+	updated, cmd := model.Update(keyPress("C"))
 	model = updated.(Model)
 	require.NotNil(t, cmd)
 	assert.Equal(t, "Copying review JSON…", model.copyFeedback)
@@ -82,7 +121,7 @@ func TestModelCopyReviewShortcutReportsClipboardFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	clipboard.EXPECT().WriteClipboard(mock.Anything, mock.Anything).Return(assert.AnError).Once()
-	updated, cmd := model.Update(keyPress("R"))
+	updated, cmd := model.Update(keyPress("C"))
 	model = updated.(Model)
 	require.NotNil(t, cmd)
 	updated, _ = model.Update(cmd())
@@ -106,7 +145,7 @@ func TestModelInlineCommentCancelAndClear(t *testing.T) {
 
 	_, err := model.reviewDraft.AddComment(core.ReviewCommentInput{FilePath: "demo.go", Range: core.ReviewLineRange{Start: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, End: core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}}, Body: "old"})
 	require.NoError(t, err)
-	updated, _ = model.Update(keyPress("C"))
+	updated, _ = model.Update(keyPress("x"))
 	model = updated.(Model)
 	assert.Empty(t, model.reviewDraft.Comments())
 	assert.Contains(t, model.copyFeedback, "Cleared review")

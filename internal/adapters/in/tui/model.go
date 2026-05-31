@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 
 	viewport "charm.land/bubbles/v2/viewport"
@@ -49,33 +50,47 @@ type clipboardCopyFailedMsg struct {
 	err error
 }
 
+type reviewProvidersLoadedMsg struct {
+	infos   []core.ReviewProviderInfo
+	threads []core.RemoteReviewThread
+	clients map[ports.ReviewProviderClient]core.ReviewProviderInfo
+	errs    []string
+}
+
 type Model struct {
-	title              string
-	files              []core.ReviewFile
-	loader             reviewLoader
-	request            core.ReviewRequest
-	loading            bool
-	loadError          string
-	selectedFile       int
-	selectedContext    int
-	width              int
-	height             int
-	reviewViewport     viewport.Model
-	reviewAnchors      ReviewAnchors
-	activeFilePath     string
-	cursorRow          int
-	selectionAnchorRow *int
-	reviewRows         []ReviewRow
-	clipboardWriter    ports.ClipboardWriter
-	lastCopiedText     string
-	copyFeedback       string
-	copyFeedbackID     int
-	diffMode           core.DiffMode
-	nerdFont           bool
-	helpActive         bool
-	search             searchState
-	reviewDraft        *core.ReviewDraft
-	commentEditor      *InlineCommentEditor
+	title                string
+	files                []core.ReviewFile
+	loader               reviewLoader
+	request              core.ReviewRequest
+	loading              bool
+	loadError            string
+	selectedFile         int
+	selectedContext      int
+	width                int
+	height               int
+	reviewViewport       viewport.Model
+	reviewAnchors        ReviewAnchors
+	activeFilePath       string
+	cursorRow            int
+	selectionAnchorRow   *int
+	reviewRows           []ReviewRow
+	clipboardWriter      ports.ClipboardWriter
+	lastCopiedText       string
+	copyFeedback         string
+	copyFeedbackID       int
+	diffMode             core.DiffMode
+	nerdFont             bool
+	helpActive           bool
+	search               searchState
+	reviewDraft          *core.ReviewDraft
+	commentEditor        *InlineCommentEditor
+	reviewContext        core.ReviewContext
+	reviewProviders      []ports.ReviewProviderClient
+	remoteThreads        []core.RemoteReviewThread
+	providerInfos        []core.ReviewProviderInfo
+	providerInfoByClient map[ports.ReviewProviderClient]core.ReviewProviderInfo
+	publish              publishState
+	ctx                  context.Context
 }
 
 func NewModel(files []core.ReviewFile) Model {
@@ -91,23 +106,40 @@ func NewModelWithLoader(files []core.ReviewFile, terminal ports.Terminal, loader
 }
 
 func NewModelWithClipboardWriter(files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest, clipboardWriter ports.ClipboardWriter) Model {
+	return NewModelWithReviewProviders(files, terminal, loader, request, clipboardWriter, core.ReviewContext{}, nil)
+}
+
+func NewModelWithReviewProviders(files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest, clipboardWriter ports.ClipboardWriter, reviewContext core.ReviewContext, providers []ports.ReviewProviderClient) Model {
+	return NewModelWithReviewProvidersContext(context.Background(), files, terminal, loader, request, clipboardWriter, reviewContext, providers)
+}
+
+func NewModelWithReviewProvidersContext(ctx context.Context, files []core.ReviewFile, terminal ports.Terminal, loader reviewLoader, request core.ReviewRequest, clipboardWriter ports.ClipboardWriter, reviewContext core.ReviewContext, providers []ports.ReviewProviderClient) Model {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if request.DiffMode == "" {
 		request.DiffMode = core.DiffModeBranch
 	}
 	m := Model{
-		title:           "ero",
-		files:           sortedReviewFiles(files),
-		loader:          loader,
-		request:         request,
-		selectedContext: -1,
-		width:           defaultWidth,
-		height:          defaultHeight,
-		reviewViewport:  viewport.New(),
-		clipboardWriter: clipboardWriter,
-		diffMode:        request.DiffMode,
-		nerdFont:        true,
-		search:          newSearchState(),
-		reviewDraft:     core.NewReviewDraft(),
+		title:                "ero",
+		files:                sortedReviewFiles(files),
+		loader:               loader,
+		request:              request,
+		selectedContext:      -1,
+		width:                defaultWidth,
+		height:               defaultHeight,
+		reviewViewport:       viewport.New(),
+		clipboardWriter:      clipboardWriter,
+		diffMode:             request.DiffMode,
+		nerdFont:             true,
+		search:               newSearchState(),
+		reviewDraft:          core.NewReviewDraft(),
+		reviewContext:        reviewContext,
+		reviewProviders:      append([]ports.ReviewProviderClient(nil), providers...),
+		providerInfos:        nil,
+		providerInfoByClient: map[ports.ReviewProviderClient]core.ReviewProviderInfo{},
+		remoteThreads:        nil,
+		ctx:                  ctx,
 	}
 	if terminal != nil {
 		m.nerdFont = terminal.SupportsNerdFont()
@@ -119,7 +151,10 @@ func NewModelWithClipboardWriter(files []core.ReviewFile, terminal ports.Termina
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	if len(m.reviewProviders) == 0 {
+		return nil
+	}
+	return m.loadReviewProvidersCmd()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -135,9 +170,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clearSelection()
 		m.commentEditor = nil
 		m.reviewDraft = core.NewReviewDraft()
+		m.providerInfos = nil
+		m.remoteThreads = nil
+		m.providerInfoByClient = map[ports.ReviewProviderClient]core.ReviewProviderInfo{}
+		m.publish = publishState{}
 		m.resetContextSelection()
 		m.reviewViewport.GotoTop()
 		m.syncReviewViewport()
+		if len(m.reviewProviders) > 0 {
+			return m, m.loadReviewProvidersCmd()
+		}
 		return m, nil
 	case reviewLoadFailedMsg:
 		m.loading = false
@@ -165,6 +207,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clipboardCopyFailedMsg:
 		m.setCopyFeedback("Copy failed: " + msg.err.Error())
 		return m, m.expireCopyFeedbackCmd()
+	case reviewProvidersLoadedMsg:
+		m.providerInfos = msg.infos
+		m.remoteThreads = msg.threads
+		m.providerInfoByClient = msg.clients
+		if len(msg.errs) > 0 {
+			m.setCopyFeedback(msg.errs[0])
+			m.syncReviewViewport()
+			return m, m.expireCopyFeedbackCmd()
+		}
+		m.syncReviewViewport()
+		return m, nil
+	case publishReviewCompletedMsg:
+		return m.handlePublishReviewCompleted(msg)
 	case tea.WindowSizeMsg:
 		m.width = max(msg.Width, 0)
 		m.height = max(msg.Height, 0)
@@ -177,7 +232,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.helpActive = false
 				return m, nil
 			case "q", "ctrl+c":
-				return m, tea.Quit
+				return m, tea.Batch(m.closeReviewProvidersCmd(), tea.Quit)
 			default:
 				return m, nil
 			}
@@ -188,6 +243,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.search.active() {
 			return m.updateSearch(msg)
 		}
+		if m.publish.active {
+			return m.updatePublishReview(msg)
+		}
 		return m.updateReviewAction(keymap.ReviewAction(msg.String()), msg)
 	default:
 		return m, nil
@@ -197,7 +255,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) updateReviewAction(action keymap.Action, msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch action {
 	case keymap.ActionQuit:
-		return m, tea.Quit
+		return m, tea.Batch(m.closeReviewProvidersCmd(), tea.Quit)
 	case keymap.ActionMoveUp:
 		m.moveCursor(-1)
 	case keymap.ActionMoveDown:
@@ -218,6 +276,8 @@ func (m Model) updateReviewAction(action keymap.Action, msg tea.KeyPressMsg) (te
 		return m.openCommentEditor()
 	case keymap.ActionClearReview:
 		m.clearReviewDraft()
+	case keymap.ActionPublishReview:
+		return m.openPublishReview()
 	case keymap.ActionCopyReviewJSON:
 		return m.copyReviewJSONToClipboard()
 	case keymap.ActionCopyPlain:
@@ -266,6 +326,7 @@ func (m Model) View() tea.View {
 			AppName:       m.title,
 			Mode:          diffModeLabel(m.diffMode, m.nerdFont),
 			FileCount:     len(m.files),
+			ProviderCount: len(m.providerInfos),
 			CurrentFile:   m.activeLocation(),
 			Message:       m.copyFeedback,
 			ScrollPercent: m.reviewViewport.ScrollPercent(),
@@ -273,6 +334,9 @@ func (m Model) View() tea.View {
 	)
 	if m.search.active() {
 		content = m.renderSearchOverlay(content)
+	}
+	if m.publish.active {
+		content = m.renderPublishOverlay(content)
 	}
 	if m.helpActive {
 		content = m.renderHelpOverlay(content)

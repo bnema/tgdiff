@@ -1,30 +1,23 @@
 package ports
 
-type SemanticTokenType string
+import "ero/internal/core"
+
+type SemanticTokenType = core.SemanticTokenType
 
 const (
-	SemanticTokenKeyword     SemanticTokenType = "keyword"
-	SemanticTokenFunction    SemanticTokenType = "function"
-	SemanticTokenTypeName    SemanticTokenType = "type"
-	SemanticTokenName        SemanticTokenType = "name"
-	SemanticTokenString      SemanticTokenType = "string"
-	SemanticTokenNumber      SemanticTokenType = "number"
-	SemanticTokenComment     SemanticTokenType = "comment"
-	SemanticTokenOperator    SemanticTokenType = "operator"
-	SemanticTokenPunctuation SemanticTokenType = "punctuation"
-	SemanticTokenText        SemanticTokenType = "text"
+	SemanticTokenKeyword     = core.SemanticTokenKeyword
+	SemanticTokenFunction    = core.SemanticTokenFunction
+	SemanticTokenTypeName    = core.SemanticTokenTypeName
+	SemanticTokenName        = core.SemanticTokenName
+	SemanticTokenString      = core.SemanticTokenString
+	SemanticTokenNumber      = core.SemanticTokenNumber
+	SemanticTokenComment     = core.SemanticTokenComment
+	SemanticTokenOperator    = core.SemanticTokenOperator
+	SemanticTokenPunctuation = core.SemanticTokenPunctuation
+	SemanticTokenText        = core.SemanticTokenText
 )
 
-// SyntaxToken represents a lexical token with position and semantic classification.
-// Type is the normalized SemanticTokenType used by core rendering decisions.
-// SourceType preserves the original lexer token kind for adapters that can use
-// source-specific detail, such as fine-grained syntax highlighting.
-type SyntaxToken struct {
-	Start      int
-	End        int
-	Type       SemanticTokenType
-	SourceType string
-}
+type SyntaxToken = core.SyntaxToken
 
 type SyntaxTokenizer interface {
 	Tokenize(filename string, lines []string) ([][]SyntaxToken, error)

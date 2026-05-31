@@ -47,7 +47,8 @@ func TestReviewDraftAddsCommentsAndExportsStableJSON(t *testing.T) {
 					"start": {"old": 0, "new": 10, "kind": "added"},
 					"end": {"old": 0, "new": 12, "kind": "added"}
 				},
-				"body": "first line\nsecond line"
+				"body": "first line\nsecond line",
+				"state": "local"
 			},
 			{
 				"id": "comment-2",
@@ -56,7 +57,8 @@ func TestReviewDraftAddsCommentsAndExportsStableJSON(t *testing.T) {
 					"start": {"old": 14, "new": 0, "kind": "deleted"},
 					"end": {"old": 14, "new": 0, "kind": "deleted"}
 				},
-				"body": "follow-up"
+				"body": "follow-up",
+				"state": "local"
 			}
 		]
 	}`, string(exported))
@@ -88,16 +90,20 @@ func TestReviewDraftRejectsInvalidComments(t *testing.T) {
 	}
 }
 
-func TestReviewDraftCommentsReturnsCopyAndClearResetsIDs(t *testing.T) {
+func TestReviewDraftCommentsReturnsDeepCopyAndClearResetsIDs(t *testing.T) {
 	t.Parallel()
 
 	draft := NewReviewDraft()
 	_, err := draft.AddComment(ReviewCommentInput{FilePath: "demo.go", Range: validReviewLineRange(), Body: "body"})
 	require.NoError(t, err)
+	draft.comments[0].ProviderRefs = []ProviderCommentRef{{ProviderID: "github", ExternalID: "1"}}
 
 	comments := draft.Comments()
 	comments[0].Body = "mutated"
-	assert.Equal(t, "body", draft.Comments()[0].Body)
+	comments[0].ProviderRefs[0].ExternalID = "mutated"
+	stored := draft.Comments()[0]
+	assert.Equal(t, "body", stored.Body)
+	assert.Equal(t, "1", stored.ProviderRefs[0].ExternalID)
 
 	draft.Clear()
 	assert.Empty(t, draft.Comments())
@@ -105,6 +111,23 @@ func TestReviewDraftCommentsReturnsCopyAndClearResetsIDs(t *testing.T) {
 	comment, err := draft.AddComment(ReviewCommentInput{FilePath: "demo.go", Range: validReviewLineRange(), Body: "new body"})
 	require.NoError(t, err)
 	assert.Equal(t, "comment-1", comment.ID)
+}
+
+func TestReviewDraftApplyPublishedRefs(t *testing.T) {
+	t.Parallel()
+
+	draft := NewReviewDraft()
+	comment, err := draft.AddComment(ReviewCommentInput{FilePath: "demo.go", Range: validReviewLineRange(), Body: "body"})
+	require.NoError(t, err)
+
+	draft.ApplyPublishedRefs("github", []PublishedReviewCommentRef{{LocalCommentID: comment.ID, ExternalID: "remote-1", ExternalURL: "https://example.com"}})
+
+	comments := draft.Comments()
+	require.Len(t, comments, 1)
+	assert.Equal(t, ReviewCommentStatePublished, comments[0].State)
+	require.Len(t, comments[0].ProviderRefs, 1)
+	assert.Equal(t, "github", comments[0].ProviderRefs[0].ProviderID)
+	assert.Equal(t, "remote-1", comments[0].ProviderRefs[0].ExternalID)
 }
 
 func TestReviewDraftExportEmptyReview(t *testing.T) {

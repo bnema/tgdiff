@@ -7,18 +7,39 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"ero/internal/ports"
 )
 
-type ReviewLoader struct {
-	baseBranchResolver ports.BaseBranchResolver
-	diffLoader         ports.GitDiffLoader
-	syntaxTokenizer    ports.SyntaxTokenizer
-	fileContentReader  ports.FileContentReader
+type reviewBaseBranchResolver interface {
+	ResolveBaseBranch(repoPath string) (string, error)
 }
 
-func NewReviewLoader(baseBranchResolver ports.BaseBranchResolver, diffLoader ports.GitDiffLoader, syntaxTokenizer ports.SyntaxTokenizer, fileContentReaders ...ports.FileContentReader) *ReviewLoader {
+type reviewGitDiffLoader interface {
+	LoadBranchDiff(repoPath, baseBranch string) (string, error)
+	LoadWorkingTreeDiff(repoPath string) (string, error)
+	LoadStagedDiff(repoPath string) (string, error)
+	LoadLocalDiff(repoPath string) (string, error)
+	LoadUpstreamDiff(repoPath, upstreamRef string) (string, error)
+	LoadCommitDiff(repoPath, revision string) (string, error)
+	LoadRangeDiff(repoPath, baseRevision, headRevision string) (string, error)
+}
+
+type reviewSyntaxTokenizer interface {
+	Tokenize(filename string, lines []string) ([][]SyntaxToken, error)
+	Language(filename string) string
+}
+
+type reviewFileContentReader interface {
+	ReadFileLines(repoPath, path string) ([]string, error)
+}
+
+type ReviewLoader struct {
+	baseBranchResolver reviewBaseBranchResolver
+	diffLoader         reviewGitDiffLoader
+	syntaxTokenizer    reviewSyntaxTokenizer
+	fileContentReader  reviewFileContentReader
+}
+
+func NewReviewLoader(baseBranchResolver reviewBaseBranchResolver, diffLoader reviewGitDiffLoader, syntaxTokenizer reviewSyntaxTokenizer, fileContentReaders ...reviewFileContentReader) *ReviewLoader {
 	loader := &ReviewLoader{
 		baseBranchResolver: baseBranchResolver,
 		diffLoader:         diffLoader,
@@ -132,7 +153,7 @@ func ParseUnifiedDiff(diff string, contextWindow int) ([]ReviewFile, error) {
 	return parseUnifiedDiff(diff, contextWindow, nil)
 }
 
-func ParseUnifiedDiffWithFileContent(repoPath, diff string, contextWindow int, reader ports.FileContentReader) ([]ReviewFile, error) {
+func ParseUnifiedDiffWithFileContent(repoPath, diff string, contextWindow int, reader reviewFileContentReader) ([]ReviewFile, error) {
 	if reader == nil {
 		return ParseUnifiedDiff(diff, contextWindow)
 	}
@@ -144,6 +165,8 @@ func ParseUnifiedDiffWithFileContent(repoPath, diff string, contextWindow int, r
 func parseUnifiedDiff(diff string, contextWindow int, readFileLines func(path string) ([]string, error)) ([]ReviewFile, error) {
 	var files []ReviewFile
 	var currentPath string
+	var currentOldPath string
+	currentStatus := ReviewFileStatusModified
 	var currentLines []ReviewLine
 	var fileLines []string
 	oldLine := 1
@@ -203,9 +226,11 @@ func parseUnifiedDiff(diff string, contextWindow int, readFileLines func(path st
 			}
 		}
 		if len(currentLines) > 0 {
-			files = append(files, BuildReviewFile(currentPath, currentLines, contextWindow))
+			files = append(files, BuildReviewFileWithMetadata(currentPath, currentOldPath, currentStatus, currentLines, contextWindow))
 		}
 		currentPath = ""
+		currentOldPath = ""
+		currentStatus = ReviewFileStatusModified
 		currentLines = nil
 		fileLines = nil
 		oldLine = 1
@@ -221,6 +246,19 @@ func parseUnifiedDiff(diff string, contextWindow int, readFileLines func(path st
 				return nil, err
 			}
 			currentPath = parseDiffPath(rawLine)
+			currentOldPath = parseOldDiffPath(rawLine)
+			currentStatus = ReviewFileStatusModified
+		case strings.HasPrefix(rawLine, "new file mode "):
+			currentStatus = ReviewFileStatusAdded
+			currentOldPath = ""
+		case strings.HasPrefix(rawLine, "deleted file mode "):
+			currentStatus = ReviewFileStatusDeleted
+		case strings.HasPrefix(rawLine, "rename from "):
+			currentStatus = ReviewFileStatusRenamed
+			currentOldPath = strings.TrimPrefix(rawLine, "rename from ")
+		case strings.HasPrefix(rawLine, "rename to "):
+			currentStatus = ReviewFileStatusRenamed
+			currentPath = strings.TrimPrefix(rawLine, "rename to ")
 		case strings.HasPrefix(rawLine, "@@ "):
 			nextOldLine, nextNewLine, err := parseUnifiedHunkHeader(rawLine)
 			if err != nil {
@@ -292,6 +330,18 @@ func parseUnifiedHunkHeader(header string) (int, int, error) {
 	return oldLine, newLine, nil
 }
 
+func parseOldDiffPath(header string) string {
+	parts := strings.Fields(header)
+	if len(parts) < 4 {
+		return ""
+	}
+	oldPath := stripDiffPathPrefix(parts[2])
+	if oldPath == "/dev/null" {
+		return ""
+	}
+	return oldPath
+}
+
 func parseDiffPath(header string) string {
 	parts := strings.Fields(header)
 	if len(parts) < 4 {
@@ -314,7 +364,7 @@ func stripDiffPathPrefix(path string) string {
 	return path
 }
 
-func applySyntaxTokens(file *ReviewFile, tokenizer ports.SyntaxTokenizer) error {
+func applySyntaxTokens(file *ReviewFile, tokenizer reviewSyntaxTokenizer) error {
 	lineContents := make([]string, 0)
 	for _, section := range file.Sections {
 		for _, line := range section.Lines {

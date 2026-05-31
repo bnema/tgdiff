@@ -58,7 +58,11 @@ func (m Model) submitCommentEditor() (Model, tea.Cmd) {
 		return m, nil
 	}
 	m.cancelCommentEditor()
-	return m.copyReviewJSONToClipboard()
+	if len(m.providerInfos) == 0 {
+		return m.copyReviewJSONToClipboard()
+	}
+	m.setCopyFeedback("Comment added; press P to publish")
+	return m, m.expireCopyFeedbackCmd()
 }
 
 func (m Model) copyReviewJSONToClipboard() (Model, tea.Cmd) {

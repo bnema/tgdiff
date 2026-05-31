@@ -114,11 +114,20 @@ func (s ReviewSection) visibleCount() int {
 
 type ReviewFile struct {
 	Path     string
+	OldPath  string
+	Status   ReviewFileStatus
 	Sections []ReviewSection
 }
 
 func BuildReviewFile(path string, lines []ReviewLine, contextWindow int) ReviewFile {
-	reviewFile := ReviewFile{Path: path}
+	return BuildReviewFileWithMetadata(path, "", ReviewFileStatusModified, lines, contextWindow)
+}
+
+func BuildReviewFileWithMetadata(path, oldPath string, status ReviewFileStatus, lines []ReviewLine, contextWindow int) ReviewFile {
+	if status == "" {
+		status = ReviewFileStatusModified
+	}
+	reviewFile := ReviewFile{Path: path, OldPath: oldPath, Status: status}
 	if len(lines) == 0 {
 		return reviewFile
 	}

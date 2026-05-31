@@ -1,20 +1,23 @@
 package core
 
-import "ero/internal/ports"
-
-type SemanticTokenType = ports.SemanticTokenType
+type SemanticTokenType string
 
 const (
-	SemanticTokenKeyword     = ports.SemanticTokenKeyword
-	SemanticTokenFunction    = ports.SemanticTokenFunction
-	SemanticTokenTypeName    = ports.SemanticTokenTypeName
-	SemanticTokenName        = ports.SemanticTokenName
-	SemanticTokenString      = ports.SemanticTokenString
-	SemanticTokenNumber      = ports.SemanticTokenNumber
-	SemanticTokenComment     = ports.SemanticTokenComment
-	SemanticTokenOperator    = ports.SemanticTokenOperator
-	SemanticTokenPunctuation = ports.SemanticTokenPunctuation
-	SemanticTokenText        = ports.SemanticTokenText
+	SemanticTokenKeyword     SemanticTokenType = "keyword"
+	SemanticTokenFunction    SemanticTokenType = "function"
+	SemanticTokenTypeName    SemanticTokenType = "type"
+	SemanticTokenName        SemanticTokenType = "name"
+	SemanticTokenString      SemanticTokenType = "string"
+	SemanticTokenNumber      SemanticTokenType = "number"
+	SemanticTokenComment     SemanticTokenType = "comment"
+	SemanticTokenOperator    SemanticTokenType = "operator"
+	SemanticTokenPunctuation SemanticTokenType = "punctuation"
+	SemanticTokenText        SemanticTokenType = "text"
 )
 
-type SyntaxToken = ports.SyntaxToken
+type SyntaxToken struct {
+	Start      int
+	End        int
+	Type       SemanticTokenType
+	SourceType string
+}

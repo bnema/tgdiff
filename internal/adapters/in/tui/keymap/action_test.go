@@ -28,8 +28,9 @@ func TestReviewAction(t *testing.T) {
 		{name: "toggle selection space alias", key: "space", want: ActionToggleSelection},
 		{name: "clear selection", key: "esc", want: ActionClearSelection},
 		{name: "open comment", key: "c", want: ActionOpenComment},
-		{name: "clear review shifted binding", key: "C", want: ActionClearReview},
-		{name: "copy review json shifted binding", key: "R", want: ActionCopyReviewJSON},
+		{name: "clear review binding", key: "x", want: ActionClearReview},
+		{name: "publish review shifted binding", key: "P", want: ActionPublishReview},
+		{name: "copy review json shifted binding", key: "C", want: ActionCopyReviewJSON},
 		{name: "copy plain", key: "y", want: ActionCopyPlain},
 		{name: "copy with metadata shifted binding", key: "Y", want: ActionCopyWithMetadata},
 		{name: "open file search", key: "f", want: ActionOpenFileSearch},
@@ -44,7 +45,7 @@ func TestReviewAction(t *testing.T) {
 		{name: "expand all context", key: "a", want: ActionExpandAllContext},
 		{name: "expand more context enter binding", key: "enter", want: ActionExpandMoreContext},
 		{name: "open help", key: "?", want: ActionOpenHelp},
-		{name: "unknown", key: "x", want: ActionNone},
+		{name: "unknown", key: "R", want: ActionNone},
 	}
 
 	for _, tt := range tests {

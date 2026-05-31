@@ -5,6 +5,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"ero/internal/adapters/in/tui/theme"
+	"ero/internal/core"
 )
 
 func (m *Model) syncReviewViewport() {
@@ -14,6 +15,7 @@ func (m *Model) syncReviewViewport() {
 	if m.reviewDraft != nil {
 		annotations.Comments = m.reviewDraft.Comments()
 	}
+	annotations.RemoteThreads = m.remoteThreads
 	annotations.Editor = m.commentEditor
 	rendered := NewReviewDocument(width).RenderWithAnnotations(m.files, m.selectedFile, m.selectedContext, annotations)
 	currentCursor := m.cursorRow
@@ -163,6 +165,9 @@ func (m Model) reviewGutter(info viewport.GutterContext) string {
 		return "  "
 	}
 	start, end, selected := m.selectedRange()
+	if marker, ok := m.commentRangeGutter(info.Index); ok {
+		return marker
+	}
 	if info.Index == m.cursorRow {
 		return theme.StatusKeyStyle.Render(nerdIconArrowRight + " ")
 	}
@@ -180,5 +185,78 @@ func (m Model) reviewLineStyle(rowIndex int) lipgloss.Style {
 	if rowIndex == m.cursorRow {
 		return theme.CursorRowStyle
 	}
+	if m.rowHasCommentRange(rowIndex) || m.rowHasActiveEditorRange(rowIndex) {
+		return theme.CommentRangeRowStyle
+	}
 	return lipgloss.NewStyle()
+}
+
+func (m Model) commentRangeGutter(rowIndex int) (string, bool) {
+	if rowIndex < 0 || rowIndex >= len(m.reviewRows) {
+		return "", false
+	}
+	if m.rowHasActiveEditorRange(rowIndex) {
+		return commentBlockMarker(m.reviewRows[rowIndex].Line, m.commentEditor.Range), true
+	}
+	if m.reviewDraft == nil {
+		return "", false
+	}
+	row := m.reviewRows[rowIndex]
+	if row.Kind != ReviewRowKindLine {
+		return "", false
+	}
+	for _, comment := range m.reviewDraft.Comments() {
+		if comment.FilePath == row.FilePath && lineInReviewRange(row.Line, comment.Range) {
+			return commentBlockMarker(row.Line, comment.Range), true
+		}
+	}
+	return "", false
+}
+
+func (m Model) rowHasCommentRange(rowIndex int) bool {
+	if rowIndex < 0 || rowIndex >= len(m.reviewRows) || m.reviewDraft == nil {
+		return false
+	}
+	row := m.reviewRows[rowIndex]
+	if row.Kind != ReviewRowKindLine {
+		return false
+	}
+	for _, comment := range m.reviewDraft.Comments() {
+		if comment.FilePath == row.FilePath && lineInReviewRange(row.Line, comment.Range) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m Model) rowHasActiveEditorRange(rowIndex int) bool {
+	if rowIndex < 0 || rowIndex >= len(m.reviewRows) || m.commentEditor == nil {
+		return false
+	}
+	row := m.reviewRows[rowIndex]
+	return row.Kind == ReviewRowKindLine && row.FilePath == m.commentEditor.FilePath && lineInReviewRange(row.Line, m.commentEditor.Range)
+}
+
+func commentBlockMarker(line core.ReviewLine, lineRange core.ReviewLineRange) string {
+	if reviewLineMatchesRef(line, lineRange.Start) {
+		return inlineCommentIconStyle.Render("╭ ")
+	}
+	if reviewLineMatchesRef(line, lineRange.End) {
+		return inlineCommentIconStyle.Render("╰ ")
+	}
+	return inlineCommentIconStyle.Render("│ ")
+}
+
+func lineInReviewRange(line core.ReviewLine, lineRange core.ReviewLineRange) bool {
+	if line.NewLineNumber > 0 && lineRange.Start.NewLineNumber > 0 && lineRange.End.NewLineNumber > 0 {
+		start := min(lineRange.Start.NewLineNumber, lineRange.End.NewLineNumber)
+		end := max(lineRange.Start.NewLineNumber, lineRange.End.NewLineNumber)
+		return line.NewLineNumber >= start && line.NewLineNumber <= end
+	}
+	if line.OldLineNumber > 0 && lineRange.Start.OldLineNumber > 0 && lineRange.End.OldLineNumber > 0 {
+		start := min(lineRange.Start.OldLineNumber, lineRange.End.OldLineNumber)
+		end := max(lineRange.Start.OldLineNumber, lineRange.End.OldLineNumber)
+		return line.OldLineNumber >= start && line.OldLineNumber <= end
+	}
+	return reviewLineMatchesRef(line, lineRange.Start) || reviewLineMatchesRef(line, lineRange.End)
 }

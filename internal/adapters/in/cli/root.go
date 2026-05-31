@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -40,16 +41,28 @@ func NewRootCommand(cfg *viper.Viper, run RunFunc) (*cobra.Command, error) {
 	flags := cmd.PersistentFlags()
 	flags.String("repo-path", ".", "Path to the git repository to review")
 	flags.Int("context-lines", 3, "Number of unchanged context lines to keep around changes")
+	flags.String("log-level", "info", "Log level (trace, debug, info, warn, error, disabled)")
+	flags.String("log-file", "", "Write logs to this file instead of the default XDG state log")
 	cfg.SetDefault("repo-path", ".")
 	cfg.SetDefault("context-lines", 3)
 	cfg.SetDefault("diff-mode", string(core.DiffModeBranch))
 	cfg.SetDefault("startup-detect", true)
+	cfg.SetDefault("log-level", "info")
 	if err := cfg.BindPFlag("repo-path", flags.Lookup("repo-path")); err != nil {
 		return nil, fmt.Errorf("bind repo-path flag: %w", err)
 	}
 	if err := cfg.BindPFlag("context-lines", flags.Lookup("context-lines")); err != nil {
 		return nil, fmt.Errorf("bind context-lines flag: %w", err)
 	}
+	if err := cfg.BindPFlag("log-level", flags.Lookup("log-level")); err != nil {
+		return nil, fmt.Errorf("bind log-level flag: %w", err)
+	}
+	if err := cfg.BindPFlag("log-file", flags.Lookup("log-file")); err != nil {
+		return nil, fmt.Errorf("bind log-file flag: %w", err)
+	}
+	cfg.SetEnvPrefix("ERO")
+	cfg.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	cfg.AutomaticEnv()
 
 	cmd.AddCommand(diffModeCommands(cfg, runCommand)...)
 
