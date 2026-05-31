@@ -5,6 +5,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"ero/internal/adapters/in/tui/theme"
+	"ero/internal/core"
 )
 
 func (m *Model) syncReviewViewport() {
@@ -170,6 +171,9 @@ func (m Model) reviewGutter(info viewport.GutterContext) string {
 	if selected && info.Index >= start && info.Index <= end {
 		return theme.SelectedExpander.Render("┃ ")
 	}
+	if m.rowHasCommentRange(info.Index) {
+		return inlineCommentIconStyle.Render(nerdIconComment + " ")
+	}
 	return "  "
 }
 
@@ -181,5 +185,38 @@ func (m Model) reviewLineStyle(rowIndex int) lipgloss.Style {
 	if rowIndex == m.cursorRow {
 		return theme.CursorRowStyle
 	}
+	if m.rowHasCommentRange(rowIndex) {
+		return theme.CommentRangeRowStyle
+	}
 	return lipgloss.NewStyle()
+}
+
+func (m Model) rowHasCommentRange(rowIndex int) bool {
+	if rowIndex < 0 || rowIndex >= len(m.reviewRows) || m.reviewDraft == nil {
+		return false
+	}
+	row := m.reviewRows[rowIndex]
+	if row.Kind != ReviewRowKindLine {
+		return false
+	}
+	for _, comment := range m.reviewDraft.Comments() {
+		if comment.FilePath == row.FilePath && lineInReviewRange(row.Line, comment.Range) {
+			return true
+		}
+	}
+	return false
+}
+
+func lineInReviewRange(line core.ReviewLine, lineRange core.ReviewLineRange) bool {
+	if line.NewLineNumber > 0 && lineRange.Start.NewLineNumber > 0 && lineRange.End.NewLineNumber > 0 {
+		start := min(lineRange.Start.NewLineNumber, lineRange.End.NewLineNumber)
+		end := max(lineRange.Start.NewLineNumber, lineRange.End.NewLineNumber)
+		return line.NewLineNumber >= start && line.NewLineNumber <= end
+	}
+	if line.OldLineNumber > 0 && lineRange.Start.OldLineNumber > 0 && lineRange.End.OldLineNumber > 0 {
+		start := min(lineRange.Start.OldLineNumber, lineRange.End.OldLineNumber)
+		end := max(lineRange.Start.OldLineNumber, lineRange.End.OldLineNumber)
+		return line.OldLineNumber >= start && line.OldLineNumber <= end
+	}
+	return reviewLineMatchesRef(line, lineRange.Start) || reviewLineMatchesRef(line, lineRange.End)
 }

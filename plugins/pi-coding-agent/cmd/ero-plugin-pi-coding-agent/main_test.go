@@ -66,7 +66,10 @@ func TestPublishReviewSendsMessageToBridge(t *testing.T) {
 	provider := piProvider{statePath: statePath}
 	result, err := provider.PublishReview(context.Background(), plugin.PublishReviewParams{Payload: plugin.ReviewPublishPayload{
 		Context: plugin.ReviewContext{Repository: plugin.RepositoryMetadata{RepoPath: "."}, Session: plugin.ReviewSessionMetadata{LocalReviewID: "local"}},
-		Draft:   plugin.ReviewDraftSnapshot{Comments: []plugin.ReviewComment{{FilePath: "main.go", Body: "Please fix", Range: plugin.ReviewLineRange{Start: plugin.ReviewLineRef{NewLineNumber: 12}}}}},
+		Draft: plugin.ReviewDraftSnapshot{Comments: []plugin.ReviewComment{{FilePath: "main.go", Body: "Please fix", Range: plugin.ReviewLineRange{
+			Start: plugin.ReviewLineRef{NewLineNumber: 12},
+			End:   plugin.ReviewLineRef{NewLineNumber: 14},
+		}}}},
 	}})
 	if err != nil {
 		t.Fatalf("PublishReview returned error: %v", err)
@@ -75,7 +78,7 @@ func TestPublishReviewSendsMessageToBridge(t *testing.T) {
 		t.Fatalf("unexpected publish result: %#v", result)
 	}
 	<-done
-	if got.Token != "secret" || got.SessionID != "s1" || !strings.Contains(got.Message, "main.go:12") || !strings.Contains(got.Message, "Please fix") {
+	if got.Token != "secret" || got.SessionID != "s1" || !strings.Contains(got.Message, "main.go:12-14") || !strings.Contains(got.Message, "Please fix") {
 		t.Fatalf("unexpected bridge request: %#v", got)
 	}
 }

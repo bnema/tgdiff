@@ -295,15 +295,25 @@ func formatReviewMessage(payload plugin.ReviewPublishPayload) string {
 	}
 	b.WriteString("Inline comments:\n")
 	for _, comment := range payload.Draft.Comments {
-		fmt.Fprintf(&b, "- %s", comment.FilePath)
-		if comment.Range.Start.NewLineNumber > 0 {
-			fmt.Fprintf(&b, ":%d", comment.Range.Start.NewLineNumber)
-		} else if comment.Range.Start.OldLineNumber > 0 {
-			fmt.Fprintf(&b, ":%d", comment.Range.Start.OldLineNumber)
-		}
-		fmt.Fprintf(&b, " — %s\n", strings.TrimSpace(comment.Body))
+		fmt.Fprintf(&b, "- %s%s — %s\n", comment.FilePath, formatLineRange(comment.Range), strings.TrimSpace(comment.Body))
 	}
 	return b.String()
+}
+
+func formatLineRange(lineRange plugin.ReviewLineRange) string {
+	if lineRange.Start.NewLineNumber > 0 {
+		if lineRange.End.NewLineNumber > 0 && lineRange.End.NewLineNumber != lineRange.Start.NewLineNumber {
+			return fmt.Sprintf(":%d-%d", lineRange.Start.NewLineNumber, lineRange.End.NewLineNumber)
+		}
+		return fmt.Sprintf(":%d", lineRange.Start.NewLineNumber)
+	}
+	if lineRange.Start.OldLineNumber > 0 {
+		if lineRange.End.OldLineNumber > 0 && lineRange.End.OldLineNumber != lineRange.Start.OldLineNumber {
+			return fmt.Sprintf(":%d-%d", lineRange.Start.OldLineNumber, lineRange.End.OldLineNumber)
+		}
+		return fmt.Sprintf(":%d", lineRange.Start.OldLineNumber)
+	}
+	return ""
 }
 
 func bridgeRegistryPath(getenv func(string) string) string {

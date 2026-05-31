@@ -13,6 +13,23 @@ import (
 	"ero/internal/ports/mocks"
 )
 
+func TestModelOpenCommentEditorUsesSelectedLineRange(t *testing.T) {
+	model := NewModel([]core.ReviewFile{reviewFileWithLines("demo.go", 3)})
+	updated, _ := model.Update(keyPress("s"))
+	model = updated.(Model)
+	updated, _ = model.Update(keyPress("j"))
+	model = updated.(Model)
+	updated, _ = model.Update(keyPress("j"))
+	model = updated.(Model)
+
+	updated, _ = model.Update(keyPress("c"))
+	model = updated.(Model)
+
+	require.NotNil(t, model.commentEditor)
+	require.Equal(t, core.ReviewLineRef{NewLineNumber: 1, Kind: core.LineKindAdded}, model.commentEditor.Range.Start)
+	require.Equal(t, core.ReviewLineRef{NewLineNumber: 3, Kind: core.LineKindAdded}, model.commentEditor.Range.End)
+}
+
 func TestModelInlineCommentSubmitCopiesReviewJSON(t *testing.T) {
 	t.Parallel()
 
