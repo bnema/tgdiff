@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -68,6 +69,9 @@ func (c ReviewDocument) RenderWithAnnotations(files []core.ReviewFile, selectedF
 		}
 		if annotations.Editor != nil && editorBelongsAfterRow(*annotations.Editor, row) {
 			availableWidth := max(c.width-len([]rune(indent)), 1)
+			header := renderEditorRangeHeader(*annotations.Editor, indent)
+			lines = append(lines, header)
+			rows = append(rows, ReviewRow{Kind: ReviewRowKindMessage, FileIndex: row.FileIndex, SectionIndex: row.SectionIndex, FilePath: row.FilePath, Text: header})
 			for editorLine := range strings.SplitSeq(annotations.Editor.Editor.ViewWithWidth(availableWidth), "\n") {
 				indentedLine := indent + editorLine
 				lines = append(lines, indentedLine)
@@ -141,6 +145,26 @@ func remoteThreadBelongsAfterRow(thread core.RemoteReviewThread, row ReviewRow) 
 		return false
 	}
 	return reviewLineMatchesRef(row.Line, thread.Range.End)
+}
+
+func renderEditorRangeHeader(editor InlineCommentEditor, indent string) string {
+	return indent + inlineCommentMutedStyle.Render("commenting "+formatReviewLineRange(editor.Range))
+}
+
+func formatReviewLineRange(lineRange core.ReviewLineRange) string {
+	if lineRange.Start.NewLineNumber > 0 {
+		if lineRange.End.NewLineNumber > 0 && lineRange.End.NewLineNumber != lineRange.Start.NewLineNumber {
+			return fmt.Sprintf("lines %d-%d", lineRange.Start.NewLineNumber, lineRange.End.NewLineNumber)
+		}
+		return fmt.Sprintf("line %d", lineRange.Start.NewLineNumber)
+	}
+	if lineRange.Start.OldLineNumber > 0 {
+		if lineRange.End.OldLineNumber > 0 && lineRange.End.OldLineNumber != lineRange.Start.OldLineNumber {
+			return fmt.Sprintf("old lines %d-%d", lineRange.Start.OldLineNumber, lineRange.End.OldLineNumber)
+		}
+		return fmt.Sprintf("old line %d", lineRange.Start.OldLineNumber)
+	}
+	return "selected range"
 }
 
 func renderInlineComment(comment core.ReviewComment, indent string) []string {

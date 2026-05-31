@@ -171,8 +171,8 @@ func (m Model) reviewGutter(info viewport.GutterContext) string {
 	if selected && info.Index >= start && info.Index <= end {
 		return theme.SelectedExpander.Render("┃ ")
 	}
-	if m.rowHasCommentRange(info.Index) {
-		return inlineCommentIconStyle.Render(nerdIconComment + " ")
+	if marker, ok := m.commentRangeGutter(info.Index); ok {
+		return marker
 	}
 	return "  "
 }
@@ -185,10 +185,32 @@ func (m Model) reviewLineStyle(rowIndex int) lipgloss.Style {
 	if rowIndex == m.cursorRow {
 		return theme.CursorRowStyle
 	}
-	if m.rowHasCommentRange(rowIndex) {
+	if m.rowHasCommentRange(rowIndex) || m.rowHasActiveEditorRange(rowIndex) {
 		return theme.CommentRangeRowStyle
 	}
 	return lipgloss.NewStyle()
+}
+
+func (m Model) commentRangeGutter(rowIndex int) (string, bool) {
+	if rowIndex < 0 || rowIndex >= len(m.reviewRows) {
+		return "", false
+	}
+	if m.rowHasActiveEditorRange(rowIndex) {
+		return commentBlockMarker(m.reviewRows[rowIndex].Line, m.commentEditor.Range), true
+	}
+	if m.reviewDraft == nil {
+		return "", false
+	}
+	row := m.reviewRows[rowIndex]
+	if row.Kind != ReviewRowKindLine {
+		return "", false
+	}
+	for _, comment := range m.reviewDraft.Comments() {
+		if comment.FilePath == row.FilePath && lineInReviewRange(row.Line, comment.Range) {
+			return commentBlockMarker(row.Line, comment.Range), true
+		}
+	}
+	return "", false
 }
 
 func (m Model) rowHasCommentRange(rowIndex int) bool {
@@ -205,6 +227,24 @@ func (m Model) rowHasCommentRange(rowIndex int) bool {
 		}
 	}
 	return false
+}
+
+func (m Model) rowHasActiveEditorRange(rowIndex int) bool {
+	if rowIndex < 0 || rowIndex >= len(m.reviewRows) || m.commentEditor == nil {
+		return false
+	}
+	row := m.reviewRows[rowIndex]
+	return row.Kind == ReviewRowKindLine && row.FilePath == m.commentEditor.FilePath && lineInReviewRange(row.Line, m.commentEditor.Range)
+}
+
+func commentBlockMarker(line core.ReviewLine, lineRange core.ReviewLineRange) string {
+	if reviewLineMatchesRef(line, lineRange.Start) {
+		return inlineCommentIconStyle.Render(nerdIconComment + "╭")
+	}
+	if reviewLineMatchesRef(line, lineRange.End) {
+		return inlineCommentIconStyle.Render("╰ ")
+	}
+	return inlineCommentIconStyle.Render("│ ")
 }
 
 func lineInReviewRange(line core.ReviewLine, lineRange core.ReviewLineRange) bool {
