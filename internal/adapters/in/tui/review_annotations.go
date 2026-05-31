@@ -185,7 +185,7 @@ func renderRemoteThread(thread core.RemoteReviewThread, indent string) []string 
 		if prefix == "" {
 			prefix = "remote"
 		}
-		for _, bodyLine := range strings.Split(comment.Body, "\n") {
+		for bodyLine := range strings.SplitSeq(comment.Body, "\n") {
 			lines = append(lines, indent+inlineCommentStyle.Render(inlineCommentBodyStyle.Render(prefix+": "+bodyLine)))
 		}
 	}
